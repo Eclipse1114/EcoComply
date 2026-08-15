@@ -15,7 +15,6 @@ st.set_page_config(
 # ---------------------------------------------------------
 # Initialize Groq Client
 # ---------------------------------------------------------
-# Automatically checks for GROQ_API_KEY in environment variables or Streamlit secrets
 groq_key = os.getenv("GROQ_API_KEY")
 if not groq_key and "GROQ_API_KEY" in st.secrets:
     groq_key = st.secrets["GROQ_API_KEY"]
@@ -137,23 +136,25 @@ Your goal is to translate dense environmental safety laws, EPA guidelines, and l
 CRITICAL INSTRUCTIONS:
 1. Ground answers strictly in official EPA/OSHA statutory standards.
 2. Provide exact legal citations (e.g., "40 CFR § 262.15").
-3. Always respond ONLY in valid JSON matching this schema:
+3. AUDIT THE INPUT: If the user explicitly states they already perform a compliant practice (e.g., "storing in metal drums"), acknowledge that action as compliant. Do NOT tell them to do what they already state they are doing. Instead, focus the action checklist on MISSING REQUIREMENTS, GAP ANALYSIS, or NEXT-STEP PROCEDURES (e.g., secondary containment, grounding wires, drum labeling, or inspection logs).
+4. Always respond ONLY in valid JSON matching this schema:
 
 {
   "business_type": "Extracted business sector",
   "applicable_statute": "Exact EPA/OSHA rule or Code of Federal Regulations title",
-  "summary": "2-sentence plain English summary of what the law requires for this business",
+  "summary": "2-sentence plain English summary acknowledging existing compliant actions and highlighting key remaining requirements",
   "action_checklist": [
-    "Step 1: Specific physical action item",
-    "Step 2: Specific physical action item",
-    "Step 3: Specific physical action item"
+    "Step 1: Specific gap or next physical action item",
+    "Step 2: Specific gap or next physical action item",
+    "Step 3: Specific gap or next physical action item"
   ],
   "risk_warning": "Potential fines, penalties, or environmental hazards of non-compliance",
-  "grant_or_incentive": "Relevant small business assistance program, EPA grant, or penalty relief policy"
+  "grant_or_incentive": "Relevant small business assistance program, state EPA grant, or penalty relief policy"
 }
 """
 
 
+@st.cache_data(show_spinner=False)
 def generate_compliance_report(business_description: str) -> dict:
     """Calls Groq API (Llama-3.3-70b) to generate structured compliance data."""
     response = client.chat.completions.create(

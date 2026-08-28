@@ -158,7 +158,7 @@ CRITICAL INSTRUCTIONS:
 def generate_compliance_report(business_description: str) -> dict:
     """Calls Groq API (Llama-3.3-70b) to generate structured compliance data."""
     response = client.chat.completions.create(
-        model="llama-3.3-70b-versatile",
+        model="openai/gpt-oss-120b",
         messages=[
             {"role": "system", "content": SYSTEM_PROMPT},
             {

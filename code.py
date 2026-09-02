@@ -1,4 +1,3 @@
-import html
 import json
 import os
 import re
@@ -19,160 +18,126 @@ st.set_page_config(
     page_title="EcoComply",
     page_icon="🌱",
     layout="wide",
-    initial_sidebar_state="expanded",
 )
-
-
-# ============================================================
-# STYLING
-# ============================================================
 
 st.markdown(
     """
     <style>
-        .block-container {
+        .stApp {
+            background: #f7f9fc;
+        }
+
+        .main .block-container {
+            max-width: 1200px;
             padding-top: 2rem;
-            padding-bottom: 3rem;
-            max-width: 1250px;
+            padding-bottom: 4rem;
         }
 
-        .eco-header {
-            padding: 1.5rem 1.75rem;
-            border-radius: 18px;
-            border: 1px solid #dfe7e1;
-            background: linear-gradient(135deg, #f4faf5, #ffffff);
-            margin-bottom: 1.5rem;
+        h1, h2, h3 {
+            color: #172033;
         }
 
-        .eco-header h1 {
-            margin: 0;
-            font-size: 2.4rem;
+        p, li, label {
+            color: #354052;
         }
 
-        .eco-header p {
-            margin-top: 0.5rem;
+        .hero {
+            background: white;
+            border: 1px solid #e2e7ef;
+            border-radius: 16px;
+            padding: 28px;
+            margin-bottom: 22px;
+            box-shadow: 0 3px 12px rgba(20, 30, 50, 0.05);
+        }
+
+        .hero h1 {
+            margin-bottom: 6px;
+        }
+
+        .hero p {
             margin-bottom: 0;
-            color: #52605a;
-            font-size: 1.05rem;
+            color: #5d6879;
         }
 
-        .section-label {
-            font-size: 0.8rem;
-            font-weight: 700;
-            letter-spacing: 0.08em;
-            text-transform: uppercase;
-            color: #68766e;
-            margin-bottom: 0.25rem;
+        .section-card {
+            background: white;
+            border: 1px solid #e2e7ef;
+            border-radius: 14px;
+            padding: 20px;
+            margin: 14px 0;
         }
 
         .status-card {
-            border: 1px solid #dfe7e1;
+            background: white;
+            border: 1px solid #e2e7ef;
             border-radius: 14px;
-            padding: 1rem 1.1rem;
-            background: #ffffff;
-            min-height: 105px;
+            padding: 18px;
+            min-height: 110px;
         }
 
-        .status-card .label {
-            color: #68766e;
-            font-size: 0.85rem;
-            font-weight: 600;
+        .status-label {
+            font-size: 0.82rem;
+            color: #6b7585;
+            margin-bottom: 4px;
         }
 
-        .status-card .value {
-            font-size: 1.4rem;
-            font-weight: 750;
-            margin-top: 0.3rem;
-        }
-
-        .requirement-card {
-            border: 1px solid #dfe7e1;
-            border-radius: 16px;
-            padding: 1.2rem 1.25rem;
-            margin: 1rem 0 0.5rem 0;
-            background: #ffffff;
-        }
-
-        .requirement-title {
-            font-size: 1.2rem;
-            font-weight: 750;
+        .status-value {
+            font-size: 1.35rem;
+            font-weight: 700;
+            color: #172033;
         }
 
         .evidence-box {
-            border-left: 4px solid #8aa996;
-            background: #f7faf8;
-            padding: 0.85rem 1rem;
-            border-radius: 0 10px 10px 0;
-            margin-top: 0.5rem;
+            background: #f7f9fc;
+            border-left: 4px solid #8a94a6;
+            padding: 12px 15px;
+            border-radius: 7px;
+            margin: 8px 0;
         }
 
-        .next-step {
-            border: 1px solid #dfe7e1;
+        .requirement-card {
+            background: white;
+            border: 1px solid #dfe5ed;
             border-radius: 12px;
-            padding: 0.85rem 1rem;
-            margin: 0.5rem 0;
-            background: #fafcfb;
+            padding: 18px;
+            margin: 12px 0;
         }
 
         .source-card {
-            border: 1px solid #e0e6e2;
+            background: white;
+            border: 1px solid #e2e7ef;
             border-radius: 12px;
-            padding: 1rem;
-            margin-bottom: 0.75rem;
-            background: #ffffff;
-        }
-
-        .source-type {
-            font-size: 0.78rem;
-            font-weight: 750;
-            text-transform: uppercase;
-            letter-spacing: 0.06em;
-            color: #68766e;
-        }
-
-        .source-title {
-            font-weight: 700;
-            margin-top: 0.2rem;
-        }
-
-        .source-score {
-            color: #6b766f;
-            font-size: 0.85rem;
-        }
-
-        .disclaimer {
-            border: 1px solid #e5e5e5;
-            background: #fafafa;
-            border-radius: 12px;
-            padding: 1rem;
-            color: #606060;
-            font-size: 0.88rem;
-            margin-top: 2rem;
-        }
-
-        .research-success {
-            border: 1px solid #cfe3d4;
-            background: #f4faf5;
-            border-radius: 12px;
-            padding: 1rem;
-            margin: 1rem 0;
-        }
-
-        .coverage-card {
-            border: 1px solid #dfe7e1;
-            border-radius: 12px;
-            padding: 0.9rem 1rem;
-            background: #fafcfb;
-            margin: 0.75rem 0 1.25rem 0;
-        }
-
-        .coverage-card strong {
-            font-size: 1rem;
+            padding: 15px;
+            margin: 8px 0;
         }
 
         .small-muted {
-            color: #68766e;
+            color: #737e8e;
             font-size: 0.85rem;
+        }
+
+        .tag {
+            display: inline-block;
+            padding: 4px 9px;
+            border-radius: 999px;
+            font-size: 0.78rem;
+            font-weight: 600;
+            margin-right: 5px;
+        }
+
+        .tag-official {
+            background: #edf3ff;
+            color: #315ea8;
+        }
+
+        .tag-regulation {
+            background: #eef8f0;
+            color: #317344;
+        }
+
+        .tag-guidance {
+            background: #fff6e8;
+            color: #8a6118;
         }
     </style>
     """,
@@ -186,13 +151,12 @@ st.markdown(
 
 st.markdown(
     """
-    <div class="eco-header">
+    <div class="hero">
         <h1>🌱 EcoComply</h1>
         <p>
-            Evidence-based environmental compliance research for small
-            businesses. EcoComply retrieves official regulatory sources,
-            identifies relevant requirements, and shows why each result
-            was flagged.
+            Evidence-based environmental compliance research for small businesses.
+            EcoComply retrieves official regulatory sources, identifies relevant
+            requirements, and shows why each result was flagged.
         </p>
     </div>
     """,
@@ -203,53 +167,67 @@ st.markdown(
 # ============================================================
 # REGULATORY SOURCE CATALOG
 # ============================================================
+#
+# Authority levels:
+# 3 = direct regulation / eCFR section
+# 2 = official EPA/EGLE program guidance
+# 1 = general overview
+#
+# The AI is instructed to prefer level 3 when making a specific
+# legal requirement claim.
+# ============================================================
 
 REGULATORY_TOPICS = {
     "Hazardous waste": [
         {
-            "name": "eCFR — 40 CFR Part 261",
-            "url": "https://www.ecfr.gov/current/title-40/chapter-I/subchapter-I/part-261",
-            "source_type": "eCFR",
-            "keywords": [
-                "hazardous waste",
-                "waste",
-                "spent solvent",
-                "solvent",
-                "waste oil",
-                "generator",
-            ],
-        },
-        {
-            "name": "eCFR — 40 CFR Part 262",
+            "title": "40 CFR Part 262 — Standards Applicable to Generators of Hazardous Waste",
             "url": "https://www.ecfr.gov/current/title-40/chapter-I/subchapter-I/part-262",
-            "source_type": "eCFR",
+            "authority": 3,
             "keywords": [
                 "hazardous waste",
                 "generator",
-                "accumulation",
                 "manifest",
-                "recordkeeping",
+                "container",
+                "storage",
+                "label",
+                "accumulation",
             ],
         },
         {
-            "name": "Michigan EGLE — Hazardous Waste",
-            "url": "https://www.michigan.gov/egle/about/organization/materials-management/hazardous-waste",
-            "source_type": "Michigan EGLE",
+            "title": "40 CFR Part 261 — Identification and Listing of Hazardous Waste",
+            "url": "https://www.ecfr.gov/current/title-40/chapter-I/subchapter-I/part-261",
+            "authority": 3,
             "keywords": [
                 "hazardous waste",
-                "waste",
-                "generator",
-                "Michigan",
+                "listed waste",
+                "characteristic",
+                "ignitable",
+                "corrosive",
+                "reactive",
+                "toxic",
             ],
         },
         {
-            "name": "Michigan EGLE — Hazardous Waste Disposal Guidance",
+            "title": "Michigan EGLE — Hazardous Waste",
+            "url": "https://www.michigan.gov/egle/about/organization/materials-management/hazardous-waste",
+            "authority": 2,
+            "keywords": [
+                "hazardous waste",
+                "generator",
+                "storage",
+                "disposal",
+                "manifest",
+            ],
+        },
+        {
+            "title": "Michigan EGLE — Hazardous Waste Disposal Guidance",
             "url": "https://www.michigan.gov/egle/about/organization/materials-management/hazardous-waste/liquid-industrial-byproducts/hw-disposal-guidance",
-            "source_type": "Michigan EGLE",
+            "authority": 2,
             "keywords": [
                 "hazardous waste",
                 "disposal",
-                "solvent",
+                "waste",
+                "manifest",
                 "container",
             ],
         },
@@ -257,27 +235,41 @@ REGULATORY_TOPICS = {
 
     "Materials storage and releases": [
         {
-            "name": "eCFR — 40 CFR Part 264",
-            "url": "https://www.ecfr.gov/current/title-40/chapter-I/subchapter-I/part-264",
-            "source_type": "eCFR",
+            "title": "40 CFR Part 262 — Hazardous Waste Generator Requirements",
+            "url": "https://www.ecfr.gov/current/title-40/chapter-I/subchapter-I/part-262",
+            "authority": 3,
             "keywords": [
                 "storage",
                 "container",
-                "release",
-                "hazardous material",
                 "hazardous waste",
+                "release",
+                "generator",
+                "accumulation",
             ],
         },
         {
-            "name": "Michigan EGLE — Automotive Repair Industry",
+            "title": "Michigan EGLE — Automotive Repair Industry",
             "url": "https://www.michigan.gov/egle/regulatory-assistance/compliance-assistance/automotive-repair-industry",
-            "source_type": "Michigan EGLE",
+            "authority": 2,
             "keywords": [
                 "automotive",
                 "repair",
+                "environmental",
                 "storage",
-                "spill",
+                "waste",
                 "release",
+            ],
+        },
+        {
+            "title": "Michigan EGLE — Environmental Rules",
+            "url": "https://www.michigan.gov/egle/regulatory-assistance/regulations",
+            "authority": 2,
+            "keywords": [
+                "environmental",
+                "rules",
+                "regulations",
+                "air",
+                "water",
                 "waste",
             ],
         },
@@ -285,155 +277,180 @@ REGULATORY_TOPICS = {
 
     "Air emissions and VOCs": [
         {
-            "name": "eCFR — 40 CFR § 63.11169",
-            "url": "https://www.ecfr.gov/current/title-40/chapter-I/subchapter-C/part-63/subpart-HHHHHH/section-63.11169",
-            "source_type": "eCFR",
-            "keywords": [
-                "air",
-                "emission",
-                "paint",
-                "coating",
-                "hazardous air pollutant",
-            ],
-        },
-        {
-            "name": "eCFR — 40 CFR § 63.11170",
-            "url": "https://www.ecfr.gov/current/title-40/chapter-I/subchapter-C/part-63/subpart-HHHHHH/section-63.11170",
-            "source_type": "eCFR",
+            "title": "40 CFR § 63.11170 — Applicability of Subpart HHHHHH",
+            "url": "https://www.ecfr.gov/current/title-40/section-63.11170",
+            "authority": 3,
             "keywords": [
                 "applicability",
                 "motor vehicle",
-                "spray",
+                "spray application",
                 "coating",
                 "paint",
+                "target HAP",
             ],
         },
         {
-            "name": "eCFR — 40 CFR § 63.11173",
-            "url": "https://www.ecfr.gov/current/title-40/chapter-I/subchapter-C/part-63/subpart-HHHHHH/section-63.11173",
-            "source_type": "eCFR",
+            "title": "40 CFR § 63.11173 — General Requirements for Subpart HHHHHH",
+            "url": "https://www.ecfr.gov/current/title-40/section-63.11173",
+            "authority": 3,
             "keywords": [
-                "paint",
-                "methylene chloride",
-                "MeCl",
+                "general requirements",
+                "management practices",
+                "paint stripping",
+                "spray",
                 "training",
-                "recordkeeping",
-                "minimization",
+                "methylene chloride",
             ],
         },
         {
-            "name": "eCFR — 40 CFR § 63.11175",
-            "url": "https://www.ecfr.gov/current/title-40/chapter-I/subchapter-C/part-63/subpart-HHHHHH/section-63.11175",
-            "source_type": "eCFR",
+            "title": "40 CFR § 63.11175 — Notifications",
+            "url": "https://www.ecfr.gov/current/title-40/section-63.11175",
+            "authority": 3,
             "keywords": [
                 "notification",
-                "paint",
-                "surface coating",
+                "initial notification",
+                "compliance notification",
             ],
         },
         {
-            "name": "EPA — About EPA's Auto Body Rule",
+            "title": "40 CFR § 63.11177 — Records",
+            "url": "https://www.ecfr.gov/current/title-40/section-63.11177",
+            "authority": 3,
+            "keywords": [
+                "records",
+                "recordkeeping",
+                "records required",
+            ],
+        },
+        {
+            "title": "EPA — About EPA's Auto Body Rule",
             "url": "https://www.epa.gov/collision-repair-campaign/about-epas-auto-body-rule",
-            "source_type": "EPA",
+            "authority": 2,
             "keywords": [
                 "auto body",
-                "collision repair",
-                "paint",
+                "paint stripping",
                 "surface coating",
-                "air",
-                "emission",
+                "air emissions",
+                "notification",
+                "training",
+            ],
+        },
+        {
+            "title": "EPA — Paint Stripping and Miscellaneous Surface Coating Operations",
+            "url": "https://www.epa.gov/stationary-sources-air-pollution/paint-stripping-and-miscellaneous-surface-coating-operations",
+            "authority": 2,
+            "keywords": [
+                "surface coating",
+                "paint stripping",
+                "hazardous air pollutants",
+                "VOC",
+                "emissions",
             ],
         },
     ],
 
     "Paint and surface coating": [
         {
-            "name": "eCFR — Subpart HHHHHH",
-            "url": "https://www.ecfr.gov/current/title-40/chapter-I/subchapter-C/part-63/subpart-HHHHHH",
-            "source_type": "eCFR",
+            "title": "40 CFR § 63.11170 — Applicability of Subpart HHHHHH",
+            "url": "https://www.ecfr.gov/current/title-40/section-63.11170",
+            "authority": 3,
             "keywords": [
-                "paint",
-                "coating",
                 "surface coating",
-                "paint stripping",
                 "motor vehicle",
-                "spray",
-            ],
-        },
-        {
-            "name": "eCFR — 40 CFR § 63.11170",
-            "url": "https://www.ecfr.gov/current/title-40/chapter-I/subchapter-C/part-63/subpart-HHHHHH/section-63.11170",
-            "source_type": "eCFR",
-            "keywords": [
+                "spray application",
+                "paint",
                 "applicability",
-                "motor vehicle",
-                "spray",
-                "coating",
             ],
         },
         {
-            "name": "EPA — About EPA's Auto Body Rule",
+            "title": "40 CFR § 63.11173 — General Requirements for Subpart HHHHHH",
+            "url": "https://www.ecfr.gov/current/title-40/section-63.11173",
+            "authority": 3,
+            "keywords": [
+                "paint stripping",
+                "surface coating",
+                "spray",
+                "management practices",
+                "training",
+            ],
+        },
+        {
+            "title": "EPA — About EPA's Auto Body Rule",
             "url": "https://www.epa.gov/collision-repair-campaign/about-epas-auto-body-rule",
-            "source_type": "EPA",
+            "authority": 2,
             "keywords": [
                 "auto body",
-                "collision repair",
-                "paint",
                 "surface coating",
+                "paint stripping",
+                "training",
+                "notification",
             ],
         },
     ],
 
     "General environmental requirements": [
         {
-            "name": "Michigan EGLE — Automotive Repair Industry",
+            "title": "Michigan EGLE — Automotive Repair Industry",
             "url": "https://www.michigan.gov/egle/regulatory-assistance/compliance-assistance/automotive-repair-industry",
-            "source_type": "Michigan EGLE",
+            "authority": 2,
             "keywords": [
                 "automotive",
                 "repair",
+                "air",
+                "water",
+                "hazardous waste",
                 "environmental",
+            ],
+        },
+        {
+            "title": "Michigan EGLE — Environmental Rules",
+            "url": "https://www.michigan.gov/egle/regulatory-assistance/regulations",
+            "authority": 2,
+            "keywords": [
+                "environmental",
+                "rules",
+                "regulations",
                 "air",
                 "water",
                 "waste",
             ],
         },
         {
-            "name": "Michigan EGLE — Environmental Rules",
-            "url": "https://www.michigan.gov/egle/regulatory-assistance/regulations",
-            "source_type": "Michigan EGLE",
+            "title": "Michigan EGLE — Administrative Rules",
+            "url": "https://www.michigan.gov/egle/regulatory-assistance/regulations/administrative-rules",
+            "authority": 2,
             "keywords": [
+                "administrative rules",
                 "environmental",
-                "regulation",
+                "regulations",
                 "rules",
-                "Michigan",
             ],
         },
     ],
 
     "Stormwater and water discharges": [
         {
-            "name": "eCFR — 40 CFR Part 122",
+            "title": "40 CFR Part 122 — EPA Administered Permit Programs",
             "url": "https://www.ecfr.gov/current/title-40/chapter-I/subchapter-D/part-122",
-            "source_type": "eCFR",
+            "authority": 3,
             "keywords": [
                 "stormwater",
-                "water discharge",
                 "discharge",
-                "runoff",
+                "water",
                 "permit",
+                "pollutant",
             ],
         },
         {
-            "name": "Michigan EGLE — Automotive Repair Industry",
+            "title": "Michigan EGLE — Automotive Repair Industry",
             "url": "https://www.michigan.gov/egle/regulatory-assistance/compliance-assistance/automotive-repair-industry",
-            "source_type": "Michigan EGLE",
+            "authority": 2,
             "keywords": [
                 "water",
                 "stormwater",
+                "discharge",
                 "automotive",
                 "repair",
-                "discharge",
             ],
         },
     ],
@@ -441,99 +458,97 @@ REGULATORY_TOPICS = {
 
 
 # ============================================================
-# TEXT HELPERS
+# TEXT UTILITIES
 # ============================================================
 
 def clean_text(text: str) -> str:
-    """Remove HTML and normalize whitespace."""
-
+    """Remove page noise and normalize whitespace."""
     if not text:
         return ""
 
-    text = re.sub(
-        r"<script.*?</script>",
-        " ",
-        text,
-        flags=re.I | re.S,
-    )
-
-    text = re.sub(
-        r"<style.*?</style>",
-        " ",
-        text,
-        flags=re.I | re.S,
-    )
-
-    text = re.sub(
-        r"<[^>]+>",
-        " ",
-        text,
-    )
-
-    replacements = {
-        "&nbsp;": " ",
-        "&amp;": "&",
-        "&lt;": "<",
-        "&gt;": ">",
-        "&quot;": '"',
-        "&#39;": "'",
-    }
-
-    for old, new in replacements.items():
-        text = text.replace(old, new)
-
-    text = re.sub(
-        r"\s+",
-        " ",
-        text,
-    )
+    text = re.sub(r"<script.*?</script>", " ", text, flags=re.I | re.S)
+    text = re.sub(r"<style.*?</style>", " ", text, flags=re.I | re.S)
+    text = re.sub(r"<[^>]+>", " ", text)
+    text = re.sub(r"\s+", " ", text)
 
     return text.strip()
 
 
+def normalize_status(status: str) -> str:
+    value = str(status or "").strip().lower()
+
+    if "action" in value:
+        return "Action Required"
+
+    if "not applicable" in value or value == "n/a":
+        return "Not Applicable"
+
+    if "compliant" in value:
+        return "Compliant"
+
+    return "Needs Review"
+
+
+def escape_html(value: Any) -> str:
+    """Safely render AI-generated text inside HTML."""
+    import html
+    return html.escape(str(value or ""))
+
+
+# ============================================================
+# RELEVANCE + EVIDENCE EXTRACTION
+# ============================================================
+
+IMPORTANT_TERMS = [
+    "must",
+    "shall",
+    "required",
+    "requirement",
+    "applicable",
+    "applicability",
+    "notification",
+    "record",
+    "recordkeeping",
+    "training",
+    "certification",
+    "container",
+    "storage",
+    "disposal",
+    "management practice",
+    "emission",
+    "spray",
+    "coating",
+    "paint stripping",
+    "hazardous waste",
+    "generator",
+    "manifest",
+]
+
+
 def score_relevance(
     text: str,
-    business_description: str,
     keywords: List[str],
+    business_description: str,
 ) -> int:
-    """
-    Deterministic retrieval relevance score.
-
-    This is a ranking signal only. It is NOT a confidence score,
-    compliance percentage, or legal assessment.
-    """
-
-    haystack = (
-        f"{business_description} {text}"
-    ).lower()
-
+    """Score a page for evidence retrieval. This is NOT confidence."""
+    lower = text.lower()
     score = 0
 
     for keyword in keywords:
-        if keyword.lower() in haystack:
-            score += 4
+        if keyword.lower() in lower:
+            score += 3
 
-    important_terms = [
-        "shall",
-        "must",
-        "required",
-        "applicable",
-        "applicability",
-        "notification",
-        "recordkeeping",
-        "training",
-        "storage",
-        "disposal",
-        "emission",
-        "hazardous",
-        "paint",
-        "coating",
-        "waste",
-        "permit",
-    ]
+    for term in IMPORTANT_TERMS:
+        if term in lower:
+            score += 1
 
-    for term in important_terms:
-        if term in haystack:
+    business_words = re.findall(
+        r"[a-zA-Z]{4,}",
+        business_description.lower(),
+    )
+
+    for word in set(business_words):
+        if word in lower:
             score += 1
 
     return score
@@ -541,149 +556,84 @@ def score_relevance(
 
 def extract_relevant_passages(
     text: str,
-    business_description: str,
     keywords: List[str],
+    business_description: str,
+    max_chars: int = 1800,
 ) -> str:
     """
-    Extract compact passages that are relevant to the business
-    and regulatory topic.
-
-    The full page stays local and is never sent to the model.
+    Extract compact passages locally so the AI receives evidence rather
+    than entire webpages.
     """
+    text = clean_text(text)
 
     if not text:
         return ""
 
-    chunks = re.split(
-        r"(?<=[.!?])\s+",
-        text,
-    )
+    # Split around sentence-like boundaries.
+    sentences = re.split(r"(?<=[.!?])\s+", text)
 
-    if len(chunks) <= 1:
-        chunks = [
-            text[i:i + 500]
-            for i in range(
-                0,
-                len(text),
-                500,
-            )
-        ]
+    scored = []
 
-    keyword_set = [
-        keyword.lower()
-        for keyword in keywords
-    ]
+    for sentence in sentences:
+        sentence = sentence.strip()
 
-    important_terms = [
-        "shall",
-        "must",
-        "required",
-        "applicable",
-        "applicability",
-        "notification",
-        "recordkeeping",
-        "training",
-        "storage",
-        "disposal",
-        "emission",
-        "hazardous",
-        "paint",
-        "coating",
-        "waste",
-        "permit",
-        "methylene chloride",
-        "MeCl",
-        "minimization",
-    ]
+        if len(sentence) < 40:
+            continue
 
-    business_words = re.findall(
-        r"[a-zA-Z]{4,}",
-        business_description.lower(),
-    )
-
-    scored_chunks = []
-
-    for index, chunk in enumerate(chunks):
-
-        lowered = chunk.lower()
-
+        lower = sentence.lower()
         score = 0
 
-        for keyword in keyword_set:
-            if keyword in lowered:
+        for keyword in keywords:
+            if keyword.lower() in lower:
                 score += 5
 
-        for term in important_terms:
-            if term.lower() in lowered:
+        for term in IMPORTANT_TERMS:
+            if term in lower:
                 score += 2
 
-        for word in business_words[:50]:
-            if word in lowered:
-                score += 1
+        # Give regulatory-looking sentences a boost.
+        if re.search(r"\b(shall|must|required|applicable|notification)\b", lower):
+            score += 4
 
         if score > 0:
-            scored_chunks.append(
-                (
-                    score,
-                    index,
-                    chunk,
-                )
-            )
+            scored.append((score, sentence))
 
-    scored_chunks.sort(
-        reverse=True
-    )
+    scored.sort(key=lambda item: item[0], reverse=True)
 
     selected = []
+    total = 0
 
-    for _, index, chunk in scored_chunks[:7]:
+    for _, sentence in scored:
+        sentence = sentence[:450]
 
-        chunk = chunk.strip()
+        if total + len(sentence) > max_chars:
+            break
 
-        if len(chunk) > 450:
-            chunk = (
-                chunk[:450]
-                .rsplit(" ", 1)[0]
-                + "..."
-            )
+        selected.append(sentence)
+        total += len(sentence)
 
-        selected.append(
-            (
-                index,
-                chunk,
-            )
-        )
+        if len(selected) >= 7:
+            break
 
-    selected.sort(
-        key=lambda item: item[0]
-    )
-
-    result = " ".join(
-        chunk
-        for _, chunk in selected
-    )
-
-    return result[:1800]
+    return "\n".join(f"- {item}" for item in selected)
 
 
 # ============================================================
 # PLAYWRIGHT
 # ============================================================
 
-def ensure_playwright_browser() -> None:
+@st.cache_resource(show_spinner=False)
+def ensure_playwright_browser() -> str:
     """
-    Ensure Chromium is installed for the current environment.
+    Install Chromium into the Streamlit Community Cloud environment
+    if it is not already present.
     """
-
     try:
-
         with sync_playwright() as p:
+            path = p.chromium.executable_path
 
-            executable = p.chromium.executable_path
-
-            if os.path.exists(executable):
-                return
-
+            if os.path.exists(path):
+                return path
     except Exception:
         pass
 
@@ -696,191 +646,153 @@ def ensure_playwright_browser() -> None:
             "chromium",
         ],
         check=True,
+        stdout=subprocess.DEVNULL,
+        stderr=subprocess.STDOUT,
     )
+
+    with sync_playwright() as p:
+        path = p.chromium.executable_path
+
+        if not os.path.exists(path):
+            raise RuntimeError(
+                "Playwright installed Chromium but the browser executable "
+                "could not be found."
+            )
+
+        return path
 
 
 def scrape_page(url: str) -> str:
-    """
-    Retrieve an official regulatory page with Playwright.
-    """
-
-    ensure_playwright_browser()
+    """Retrieve rendered text from an official regulatory page."""
+    browser_path = ensure_playwright_browser()
 
     with sync_playwright() as p:
-
         browser = p.chromium.launch(
-            headless=True
+            executable_path=browser_path,
+            headless=True,
         )
 
         page = browser.new_page(
             user_agent=(
-                "Mozilla/5.0 "
-                "(compatible; EcoComply/1.0)"
+                "EcoComply/1.0 "
+                "(educational environmental compliance research tool)"
             )
         )
 
-        text = ""
-
         try:
-
             page.goto(
                 url,
                 wait_until="domcontentloaded",
-                timeout=45000,
+                timeout=30000,
             )
 
-            page.wait_for_timeout(1000)
+            page.wait_for_timeout(1200)
 
-            text = page.locator(
-                "body"
-            ).inner_text(
-                timeout=15000
-            )
+            text = page.locator("body").inner_text()
 
-            text = clean_text(text)
+            return clean_text(text)
 
         finally:
-
             browser.close()
-
-    blocked_phrases = [
-        "access denied",
-        "request access",
-        "403 forbidden",
-        "404 not found",
-        "captcha",
-        "checking your browser",
-        "enable javascript",
-    ]
-
-    lowered = text.lower()
-
-    if any(
-        phrase in lowered
-        for phrase in blocked_phrases
-    ):
-        return ""
-
-    if len(text) < 500:
-        return ""
-
-    return text
 
 
 # ============================================================
 # TOPIC DETECTION
 # ============================================================
 
-def detect_topics(
-    business_description: str,
-) -> List[str]:
+TOPIC_KEYWORDS = {
+    "Hazardous waste": [
+        "hazardous waste",
+        "solvent",
+        "used solvent",
+        "waste paint",
+        "waste thinner",
+        "manifest",
+        "waste container",
+        "chemical waste",
+    ],
+    "Materials storage and releases": [
+        "storage",
+        "chemical",
+        "solvent",
+        "release",
+        "spill",
+        "container",
+        "materials",
+    ],
+    "Air emissions and VOCs": [
+        "voc",
+        "volatile organic compound",
+        "air emission",
+        "air emissions",
+        "spray",
+        "paint",
+        "coating",
+        "solvent",
+    ],
+    "Paint and surface coating": [
+        "paint",
+        "painting",
+        "surface coating",
+        "spray booth",
+        "spray application",
+        "paint stripping",
+    ],
+    "General environmental requirements": [
+        "environmental",
+        "compliance",
+        "automotive repair",
+        "repair shop",
+        "regulations",
+    ],
+    "Stormwater and water discharges": [
+        "stormwater",
+        "storm water",
+        "water discharge",
+        "discharge",
+        "drain",
+        "wastewater",
+    ],
+}
 
-    text = business_description.lower()
 
-    topic_keywords = {
+def detect_topics(description: str) -> List[str]:
+    lower = description.lower()
+    detected = []
 
-        "Hazardous waste": [
-            "hazardous waste",
-            "waste",
-            "spent solvent",
-            "solvent",
-            "waste oil",
-            "chemical waste",
-        ],
+    for topic, keywords in TOPIC_KEYWORDS.items():
+        if any(keyword in lower for keyword in keywords):
+            detected.append(topic)
 
-        "Materials storage and releases": [
-            "storage",
-            "container",
-            "spill",
-            "release",
-            "chemical",
-            "fuel",
-        ],
-
-        "Air emissions and VOCs": [
-            "air",
-            "emission",
-            "voc",
-            "paint",
-            "spray",
-            "coating",
-            "solvent",
-        ],
-
-        "Paint and surface coating": [
-            "paint",
-            "painting",
-            "spray",
-            "surface coating",
-            "auto body",
-            "collision repair",
-            "body shop",
-        ],
-
-        "General environmental requirements": [
-            "automotive",
-            "repair",
-            "environmental",
-            "business",
-        ],
-
-        "Stormwater and water discharges": [
-            "stormwater",
-            "runoff",
-            "water discharge",
-            "discharge",
-            "drain",
-            "wastewater",
-        ],
-    }
-
-    matched = []
-
-    for topic, keywords in topic_keywords.items():
-
-        if any(
-            keyword in text
-            for keyword in keywords
-        ):
-            matched.append(topic)
-
-    if not matched:
-        matched = [
-            "General environmental requirements"
+    if not detected:
+        detected = [
+            "General environmental requirements",
+            "Hazardous waste",
         ]
 
-    return matched
+    return detected
 
 
 # ============================================================
 # SOURCE CATALOG
 # ============================================================
 
-def build_source_catalog(
-    topics: List[str],
-) -> List[Dict[str, Any]]:
-
+def build_source_catalog(topics: List[str]) -> List[Dict[str, Any]]:
     sources = []
     seen_urls = set()
 
     for topic in topics:
+        for source in REGULATORY_TOPICS.get(topic, []):
+            url = source["url"]
 
-        for source in REGULATORY_TOPICS.get(
-            topic,
-            [],
-        ):
-
-            if source["url"] in seen_urls:
+            if url in seen_urls:
                 continue
 
-            copied = dict(source)
-            copied["topic"] = topic
+            seen_urls.add(url)
 
-            sources.append(copied)
-
-            seen_urls.add(
-                source["url"]
-            )
+            item = dict(source)
+            item["topic"] = topic
+            sources.append(item)
 
     return sources
 
@@ -893,140 +805,217 @@ def retrieve_evidence(
     business_description: str,
     topics: List[str],
 ) -> List[Dict[str, Any]]:
+    catalog = build_source_catalog(topics)
 
-    catalog = build_source_catalog(
-        topics
-    )
-
-    retrieved = []
+    results = []
 
     progress = st.progress(0)
     status = st.empty()
 
-    total = len(catalog)
-
     for index, source in enumerate(catalog):
-
         status.info(
-            f"Searching official sources... "
-            f"{index + 1}/{total}: "
-            f"{source['name']}"
+            f"Searching official source {index + 1} of {len(catalog)}: "
+            f"{source['title']}"
         )
 
         try:
+            full_text = scrape_page(source["url"])
 
-            full_text = scrape_page(
-                source["url"]
+            if len(full_text) < 250:
+                continue
+
+            # Ignore obvious access/interstitial pages.
+            blocked_phrases = [
+                "access denied",
+                "request blocked",
+                "verify you are human",
+                "captcha",
+            ]
+
+            if any(
+                phrase in full_text.lower()
+                for phrase in blocked_phrases
+            ):
+                continue
+
+            score = score_relevance(
+                full_text,
+                source["keywords"],
+                business_description,
             )
 
-            if full_text:
+            evidence = extract_relevant_passages(
+                full_text,
+                source["keywords"],
+                business_description,
+            )
 
-                score = score_relevance(
-                    full_text,
-                    business_description,
-                    source["keywords"],
-                )
+            if not evidence:
+                continue
 
-                relevant_passages = (
-                    extract_relevant_passages(
-                        full_text,
-                        business_description,
-                        source["keywords"],
-                    )
-                )
-
-                if relevant_passages:
-
-                    # Do not keep the entire page in session state.
-                    # Only the selected evidence is needed later.
-                    retrieved.append(
-                        {
-                            "name": source["name"],
-                            "url": source["url"],
-                            "source_type": source[
-                                "source_type"
-                            ],
-                            "topic": source["topic"],
-                            "relevance_score": score,
-                            "evidence": relevant_passages,
-                        }
-                    )
-
-        except Exception as exc:
-
-            retrieved.append(
+            results.append(
                 {
-                    "name": source["name"],
+                    "title": source["title"],
                     "url": source["url"],
-                    "source_type": source[
-                        "source_type"
-                    ],
                     "topic": source["topic"],
-                    "relevance_score": 0,
-                    "evidence": "",
-                    "error": str(exc),
+                    "authority": source["authority"],
+                    "score": score,
+                    "evidence": evidence,
+                    "full_text": full_text,
                 }
             )
 
-        progress.progress(
-            (index + 1) / max(total, 1)
-        )
+        except Exception:
+            # One unavailable source should not kill the entire research run.
+            continue
+
+        progress.progress((index + 1) / max(len(catalog), 1))
 
     status.empty()
     progress.empty()
 
-    retrieved.sort(
-        key=lambda item: item.get(
-            "relevance_score",
-            0,
-        ),
+    # Authority matters in addition to relevance.
+    #
+    # Direct regulations get a large boost so a broad guidance page
+    # cannot displace the actual regulation.
+    for result in results:
+        result["ranking_score"] = (
+            result["score"] + result["authority"] * 12
+        )
+
+    results.sort(
+        key=lambda item: item["ranking_score"],
         reverse=True,
     )
 
-    usable = [
-        source
-        for source in retrieved
-        if source.get("evidence")
-    ][:5]
-
-    return usable
+    # Keep the AI evidence packet small enough for the free Groq limit.
+    return results[:6]
 
 
 # ============================================================
-# JSON EXTRACTION
+# AI JSON EXTRACTION
 # ============================================================
 
-def extract_json(
-    text: str,
-) -> Dict[str, Any]:
-
+def extract_json(text: str) -> Dict[str, Any]:
     text = text.strip()
+
+    # Remove markdown fences if the model adds them.
+    text = re.sub(r"^```json\s*", "", text, flags=re.I)
+    text = re.sub(r"^```\s*", "", text)
+    text = re.sub(r"\s*```$", "", text)
 
     try:
         return json.loads(text)
-
     except json.JSONDecodeError:
         pass
 
-    match = re.search(
-        r"\{.*\}",
-        text,
-        flags=re.DOTALL,
-    )
+    match = re.search(r"\{.*\}", text, flags=re.S)
 
     if match:
+        return json.loads(match.group(0))
 
-        try:
-            return json.loads(
-                match.group(0)
-            )
+    raise ValueError("The AI returned invalid JSON.")
 
-        except json.JSONDecodeError:
-            pass
 
-    raise ValueError(
-        "The AI returned invalid JSON."
+# ============================================================
+# VALIDATION
+# ============================================================
+
+def validate_requirement(
+    requirement: Dict[str, Any],
+    evidence_sources: List[Dict[str, Any]],
+) -> Dict[str, Any]:
+    """
+    Prevent the UI from presenting an unsupported citation as if it were
+    validated by EcoComply.
+
+    The AI must cite one of the retrieved source titles.
+    """
+    valid_titles = {
+        source["title"]
+        for source in evidence_sources
+    }
+
+    citation = str(
+        requirement.get("citation", "")
+    ).strip()
+
+    matched_source = None
+
+    for source in evidence_sources:
+        title = source["title"]
+
+        if citation.lower() == title.lower():
+            matched_source = source
+            break
+
+        if title.lower() in citation.lower():
+            matched_source = source
+            break
+
+    if matched_source is None:
+        requirement["citation"] = "Retrieved official source"
+        requirement["citation_validated"] = False
+        requirement["source_url"] = ""
+    else:
+        requirement["citation"] = matched_source["title"]
+        requirement["citation_validated"] = True
+        requirement["source_url"] = matched_source["url"]
+
+    requirement["status"] = normalize_status(
+        requirement.get("status", "Needs Review")
     )
+
+    return requirement
+
+
+def validate_analysis(
+    analysis: Dict[str, Any],
+    evidence_sources: List[Dict[str, Any]],
+) -> Dict[str, Any]:
+    requirements = analysis.get("requirements", [])
+
+    if not isinstance(requirements, list):
+        requirements = []
+
+    validated = []
+
+    for requirement in requirements:
+        if not isinstance(requirement, dict):
+            continue
+
+        validated.append(
+            validate_requirement(
+                requirement,
+                evidence_sources,
+            )
+        )
+
+    analysis["requirements"] = validated
+
+    # Recalculate counts ourselves rather than trusting model arithmetic.
+    counts = {
+        "Compliant": 0,
+        "Needs Review": 0,
+        "Action Required": 0,
+        "Not Applicable": 0,
+    }
+
+    for requirement in validated:
+        counts[requirement["status"]] += 1
+
+    analysis["counts"] = counts
+
+    if counts["Action Required"] > 0:
+        analysis["overall_status"] = "Action Required"
+    elif counts["Needs Review"] > 0:
+        analysis["overall_status"] = "Needs Review"
+    elif counts["Compliant"] > 0:
+        analysis["overall_status"] = "Compliant"
+    else:
+        analysis["overall_status"] = "Needs Review"
+
+    return analysis
 
 
 # ============================================================
@@ -1035,180 +1024,114 @@ def extract_json(
 
 def analyze_compliance(
     business_description: str,
-    evidence: List[Dict[str, Any]],
+    evidence_sources: List[Dict[str, Any]],
 ) -> Dict[str, Any]:
 
-    api_key = st.secrets.get(
-        "GROQ_API_KEY",
-        "",
-    )
+    api_key = os.getenv("GROQ_API_KEY")
 
     if not api_key:
         raise RuntimeError(
-            "GROQ_API_KEY is missing from "
-            "Streamlit secrets."
+            "GROQ_API_KEY is not configured. Add it to Streamlit secrets."
         )
 
-    client = Groq(
-        api_key=api_key
-    )
+    client = Groq(api_key=api_key)
 
-    # --------------------------------------------------------
-    # SMALL EVIDENCE PACKET
-    # --------------------------------------------------------
+    compact_sources = []
 
-    evidence_packet = []
-
-    for source in evidence:
-
-        evidence_packet.append(
+    for index, source in enumerate(evidence_sources, start=1):
+        compact_sources.append(
             {
-                "source": source["name"],
+                "source_id": f"S{index}",
+                "title": source["title"],
                 "topic": source["topic"],
-                "citation_source_url": source["url"],
+                "authority_level": source["authority"],
+                "url": source["url"],
                 "evidence": source["evidence"][:1400],
             }
         )
 
-    packet_text = json.dumps(
-        evidence_packet,
-        ensure_ascii=False,
-        separators=(
-            ",",
-            ":",
-        ),
-    )
-
-    business_description = (
-        business_description[:2500]
-    )
-
-    # --------------------------------------------------------
-    # CONSERVATIVE ANALYSIS INSTRUCTIONS
-    # --------------------------------------------------------
+    business_description = business_description[:2500]
 
     system_prompt = """
 You are EcoComply's environmental compliance analysis engine.
 
-You are analyzing a small business using ONLY the official
-regulatory evidence supplied by the application.
+You receive:
+1. A business description.
+2. Evidence retrieved from official government sources.
 
-CRITICAL RULES:
+Rules:
 
-1. Never invent regulations, citations, deadlines, penalties,
-   exemptions, thresholds, permits, forms, or requirements.
+- Use ONLY the supplied evidence.
+- Never invent a regulation, citation, deadline, penalty, form, permit,
+  threshold, exemption, or requirement.
+- Prefer direct eCFR regulatory sources over EPA or state guidance when
+  making a specific legal requirement claim.
+- An EPA/EGLE guidance page may establish that a topic is relevant,
+  describe a program, or point to forms/resources, but do not turn
+  general guidance into a specific legal obligation unless the evidence
+  actually supports that conclusion.
+- If the evidence is insufficient to establish a requirement, say so.
+- Do not claim that a business is legally compliant.
+- "Compliant" means the supplied business evidence appears to satisfy
+  the supplied regulatory evidence.
+- If the business provides no evidence about a requirement, use
+  "Needs Review".
+- "Action Required" should be used only when the supplied business
+  evidence indicates a clear mismatch with a requirement.
+- "Not Applicable" should only be used when the supplied evidence
+  establishes that the requirement does not apply.
+- Keep requirements focused and concrete.
+- Cite a retrieved source by its exact title.
+- The source URL must come from the supplied evidence.
+- Distinguish between:
+    A. what the source explicitly requires,
+    B. what the source describes or recommends,
+    C. what EcoComply cannot establish from the available business evidence.
 
-2. Do not use your general knowledge to fill gaps in the
-   supplied evidence.
-
-3. Every requirement must be supported by a supplied source.
-
-4. Distinguish between:
-   - a source describing a regulation,
-   - a regulation that may apply,
-   - and a requirement that the supplied evidence clearly
-     establishes for this business.
-
-5. Do not assume that a material, waste stream, activity,
-   permit, form, or regulatory category applies merely because
-   the business description mentions a related activity.
-
-6. If applicability depends on missing facts, say so and use
-   "Needs Review".
-
-7. Do not declare that the business is legally compliant.
-
-8. Use "Compliant" only when:
-   - the supplied evidence clearly establishes the requirement,
-   - the business information addresses that requirement,
-   - and nothing supplied indicates a gap.
-
-9. Use "Action Required" only when the supplied information
-   clearly establishes that the business is failing to meet
-   a requirement.
-
-10. Use "Not Applicable" only when the supplied evidence clearly
-    establishes that the requirement does not apply.
-
-11. When evidence is insufficient, prefer "Needs Review".
-
-12. Recommended actions must be limited to reasonable next steps
-    supported by the supplied evidence. Do not invent technical
-    controls or legal obligations.
-
-13. If a source merely provides general guidance or a list of
-    resources/forms, do not automatically describe every item
-    on that page as a mandatory requirement.
-
-14. Be concise.
-
-15. Return ONLY valid JSON.
+Return JSON only.
 """
 
     user_prompt = f"""
-BUSINESS INFORMATION:
+BUSINESS DESCRIPTION:
 {business_description}
 
-OFFICIAL REGULATORY EVIDENCE:
-{packet_text}
+OFFICIAL RETRIEVED EVIDENCE:
+{json.dumps(compact_sources, separators=(",", ":"))}
 
-Create a focused preliminary assessment.
-
-Return exactly this JSON structure:
+Return this structure:
 
 {{
-  "overall_status": "Compliant | Needs Review | Action Required",
-  "summary": "short evidence-based summary",
+  "summary": "2-4 sentence assessment",
   "requirements": [
     {{
-      "title": "short title",
+      "name": "short requirement name",
       "status": "Compliant | Needs Review | Action Required | Not Applicable",
-      "requirement": "specific requirement supported by the supplied evidence",
-      "citation": "specific citation supported by the source",
-      "regulatory_evidence": "short passage or faithful summary of supplied evidence",
-      "business_evidence": "what the business information establishes, or that it does not establish enough",
-      "why_flagged": "why this status follows from the evidence",
-      "recommended_action": "specific evidence-supported next step",
-      "source_url": "URL from supplied evidence"
+      "requirement": "What the evidence establishes",
+      "citation": "EXACT retrieved source title",
+      "regulatory_evidence": "Short evidence-based explanation",
+      "business_evidence": "What the business description establishes",
+      "why_flagged": "Why EcoComply reached this status",
+      "recommended_action": "Specific next step supported by the evidence"
     }}
   ],
   "next_steps": [
-    "specific evidence-supported next step"
+    "short evidence-based next step"
   ]
 }}
 
-IMPORTANT:
-
-Do not convert a general regulatory topic into a specific legal
-requirement unless the supplied evidence supports that conclusion.
-
-For example, if the evidence says an activity is regulated but
-the business description does not provide enough information to
-determine which specific requirements apply, mark the finding
-"Needs Review" and explain what information is missing.
-
-Keep the number of requirements focused on the strongest findings.
+Create no more than 6 requirements.
 """
 
-    # --------------------------------------------------------
-    # REQUEST SIZE GUARD
-    # --------------------------------------------------------
-
+    # Stay comfortably below the free 8K TPM limit.
     estimated_input_tokens = (
-        len(system_prompt)
-        + len(user_prompt)
+        len(system_prompt) + len(user_prompt)
     ) // 4
 
-    if estimated_input_tokens > 4500:
-
+    if estimated_input_tokens > 4800:
         raise RuntimeError(
-            "The regulatory evidence packet is still too large. "
-            "EcoComply stopped before sending an oversized AI request."
+            "The regulatory evidence packet was too large for the "
+            "current API limit. Reduce the evidence packet and try again."
         )
-
-    # --------------------------------------------------------
-    # GROQ REQUEST
-    # --------------------------------------------------------
 
     response = client.chat.completions.create(
         model="openai/gpt-oss-120b",
@@ -1227,227 +1150,113 @@ Keep the number of requirements focused on the strongest findings.
         reasoning_effort="low",
     )
 
-    content = response.choices[0].message.content
+    raw = response.choices[0].message.content
 
-    return extract_json(
-        content
+    analysis = extract_json(raw)
+
+    return validate_analysis(
+        analysis,
+        evidence_sources,
     )
 
 
 # ============================================================
-# DISPLAY HELPERS
+# UI HELPERS
 # ============================================================
 
-def normalize_status(
-    status: str,
-) -> str:
-
-    if not status:
-        return "Needs Review"
-
-    normalized = status.strip().lower()
-
-    mapping = {
-        "compliant": "Compliant",
-        "needs review": "Needs Review",
-        "action required": "Action Required",
-        "not applicable": "Not Applicable",
-    }
-
-    return mapping.get(
-        normalized,
-        "Needs Review",
-    )
-
-
-def status_icon(
-    status: str,
-) -> str:
-
+def status_icon(status: str) -> str:
     return {
         "Compliant": "✅",
         "Needs Review": "⚠️",
         "Action Required": "🔴",
         "Not Applicable": "➖",
-    }.get(
-        status,
-        "⚠️",
+    }.get(status, "⚠️")
+
+
+def authority_label(authority: int) -> str:
+    if authority >= 3:
+        return "Direct regulation"
+    if authority == 2:
+        return "Official guidance"
+    return "Overview"
+
+
+def render_status_card(label: str, value: str):
+    st.markdown(
+        f"""
+        <div class="status-card">
+            <div class="status-label">{escape_html(label)}</div>
+            <div class="status-value">{escape_html(value)}</div>
+        </div>
+        """,
+        unsafe_allow_html=True,
     )
-
-
-def safe_text(value: Any) -> str:
-    """
-    Convert model output to safe display text.
-    """
-
-    if value is None:
-        return ""
-
-    return html.escape(
-        str(value)
-    )
-
-
-def clean_requirement(
-    requirement: Dict[str, Any],
-) -> Dict[str, Any]:
-
-    return {
-        "title": str(
-            requirement.get(
-                "title",
-                "Untitled requirement",
-            )
-        ),
-        "status": normalize_status(
-            str(
-                requirement.get(
-                    "status",
-                    "Needs Review",
-                )
-            )
-        ),
-        "requirement": str(
-            requirement.get(
-                "requirement",
-                "Requirement could not be determined.",
-            )
-        ),
-        "citation": str(
-            requirement.get(
-                "citation",
-                "Not specified",
-            )
-        ),
-        "regulatory_evidence": str(
-            requirement.get(
-                "regulatory_evidence",
-                "No regulatory evidence provided.",
-            )
-        ),
-        "business_evidence": str(
-            requirement.get(
-                "business_evidence",
-                "No business evidence provided.",
-            )
-        ),
-        "why_flagged": str(
-            requirement.get(
-                "why_flagged",
-                "Additional evidence is needed.",
-            )
-        ),
-        "recommended_action": str(
-            requirement.get(
-                "recommended_action",
-                "Review the applicable requirement.",
-            )
-        ),
-        "source_url": str(
-            requirement.get(
-                "source_url",
-                "",
-            )
-        ),
-    }
 
 
 # ============================================================
 # SIDEBAR
 # ============================================================
 
-with st.sidebar:
+st.sidebar.header("Business profile")
 
-    st.header(
-        "Business profile"
-    )
+preset = st.sidebar.selectbox(
+    "Start with a profile",
+    [
+        "Custom",
+        "Auto body shop",
+        "Automotive repair shop",
+        "Small manufacturing shop",
+    ],
+)
 
-    st.caption(
-        "Describe what the business does. "
-        "EcoComply uses this information to identify "
-        "relevant official regulatory sources."
-    )
+PRESETS = {
+    "Auto body shop": (
+        "A small automotive collision repair shop that sands, paints, "
+        "and refinishes vehicles. The shop uses spray equipment, paints, "
+        "solvents, and other chemicals. It generates used solvent "
+        "containers and other waste from repair and painting activities."
+    ),
+    "Automotive repair shop": (
+        "A small automotive repair shop that performs mechanical repairs, "
+        "uses oils, solvents, cleaners and other chemicals, and generates "
+        "used automotive fluids and waste materials."
+    ),
+    "Small manufacturing shop": (
+        "A small manufacturing business that uses paints, solvents, "
+        "industrial chemicals and production materials. The facility "
+        "generates process waste and stores chemical materials on site."
+    ),
+}
 
-    preset = st.selectbox(
-        "Example business",
-        [
-            "Custom",
-            "Auto body shop",
-            "Automotive repair shop",
-            "Small manufacturing shop",
-        ],
-    )
 
-    presets = {
+if preset != "Custom":
+    default_description = PRESETS[preset]
+else:
+    default_description = ""
 
-        "Auto body shop": (
-            "We operate an auto body repair shop. "
-            "We repair damaged vehicles, perform sanding "
-            "and painting, use spray application equipment, "
-            "and store paints, solvents, and other automotive "
-            "chemicals. We generate used solvent containers "
-            "and other waste materials."
-        ),
 
-        "Automotive repair shop": (
-            "We operate an automotive repair shop. "
-            "We perform mechanical repairs, use automotive "
-            "fluids and cleaning solvents, store chemicals "
-            "and parts, and generate used fluids and other waste."
-        ),
+business_description = st.sidebar.text_area(
+    "Describe the business",
+    value=default_description,
+    height=220,
+    help=(
+        "Describe activities, materials, waste, equipment, storage, "
+        "and emissions. Do not include sensitive personal information."
+    ),
+)
 
-        "Small manufacturing shop": (
-            "We operate a small manufacturing facility. "
-            "We use paints, coatings, solvents, and other "
-            "chemicals during production and store these "
-            "materials on site. We generate industrial waste "
-            "and may have air emissions."
-        ),
-    }
-
-    default_description = presets.get(
-        preset,
-        "",
-    )
-
-    business_description = st.text_area(
-        "Business description",
-        value=default_description,
-        height=230,
-        placeholder=(
-            "Example: We operate an auto body shop "
-            "and paint damaged vehicles..."
-        ),
-    )
-
-    st.divider()
-
-    st.markdown(
-        """
-        **How EcoComply works**
-
-        1. Understand the business
-        2. Identify regulatory topics
-        3. Retrieve official sources
-        4. Extract relevant evidence
-        5. Analyze requirements
-        6. Show the evidence chain
-        """
-    )
-
-    run_analysis = st.button(
-        "🔎 Run compliance research",
-        type="primary",
-        use_container_width=True,
-    )
+st.sidebar.caption(
+    "EcoComply performs preliminary educational research using "
+    "retrieved official sources."
+)
 
 
 # ============================================================
 # SESSION STATE
 # ============================================================
 
-if "assessment" not in st.session_state:
-    st.session_state.assessment = None
+if "analysis" not in st.session_state:
+    st.session_state.analysis = None
 
 if "sources" not in st.session_state:
     st.session_state.sources = []
@@ -1455,473 +1264,369 @@ if "sources" not in st.session_state:
 if "topics" not in st.session_state:
     st.session_state.topics = []
 
-if "business_description" not in st.session_state:
-    st.session_state.business_description = ""
-
 
 # ============================================================
-# RUN ANALYSIS
+# RUN BUTTON
 # ============================================================
+
+run_analysis = st.button(
+    "🔎 Research compliance",
+    type="primary",
+    use_container_width=True,
+)
+
 
 if run_analysis:
 
     if not business_description.strip():
-
-        st.error(
-            "Please enter a business description first."
+        st.warning(
+            "Please describe the business before starting the research."
         )
-
         st.stop()
 
+    st.session_state.analysis = None
+    st.session_state.sources = []
+    st.session_state.topics = []
+
+    topics = detect_topics(business_description)
+
+    st.session_state.topics = topics
+
+    st.markdown("## 🔎 Regulatory research")
+
+    st.write(
+        "Targeted topics: "
+        + ", ".join(topics)
+    )
+
     try:
-
-        # ----------------------------------------------------
-        # TOPIC DETECTION
-        # ----------------------------------------------------
-
-        topics = detect_topics(
-            business_description
+        sources = retrieve_evidence(
+            business_description,
+            topics,
         )
 
-        st.session_state.topics = topics
-        st.session_state.business_description = (
-            business_description
-        )
-
-        st.markdown(
-            '<div class="section-label">Research</div>',
-            unsafe_allow_html=True,
-        )
-
-        st.subheader(
-            "🔎 Regulatory research"
-        )
-
-        st.write(
-            "Targeted topics: "
-            + ", ".join(topics)
-        )
-
-        # ----------------------------------------------------
-        # RETRIEVAL
-        # ----------------------------------------------------
-
-        with st.spinner(
-            "Searching official regulatory sources..."
-        ):
-
-            sources = retrieve_evidence(
-                business_description,
-                topics,
+        if not sources:
+            st.error(
+                "EcoComply could not retrieve usable official regulatory "
+                "evidence for this business description."
             )
+            st.stop()
 
         st.session_state.sources = sources
 
-        if not sources:
-
-            st.error(
-                "EcoComply could not retrieve usable "
-                "regulatory evidence from the official sources."
-            )
-
-            st.stop()
-
-        st.markdown(
-            f"""
-            <div class="research-success">
-                <strong>✓ Research complete</strong><br>
-                Retrieved {len(sources)} usable official
-                {"source" if len(sources) == 1 else "sources"}.
-                Relevant passages were extracted locally before
-                the AI analysis.
-            </div>
-            """,
-            unsafe_allow_html=True,
+        st.success(
+            f"Research complete — retrieved {len(sources)} usable "
+            "official sources. Relevant passages were extracted locally "
+            "before the AI analysis."
         )
-
-        # ----------------------------------------------------
-        # ANALYSIS
-        # ----------------------------------------------------
-
-        st.markdown(
-            '<div class="section-label">Analysis</div>',
-            unsafe_allow_html=True,
-        )
-
-        st.subheader(
-            "📋 Compliance assessment"
-        )
-
-        with st.spinner(
-            "Comparing business information against "
-            "retrieved requirements..."
-        ):
-
-            assessment = analyze_compliance(
-                business_description,
-                sources,
-            )
-
-        st.session_state.assessment = assessment
 
     except Exception as exc:
-
         st.error(
-            "EcoComply encountered an error while running "
-            "the assessment."
+            "Regulatory retrieval failed."
         )
+        st.exception(exc)
+        st.stop()
 
-        with st.expander(
-            "Technical details"
-        ):
-
-            st.code(
-                str(exc)
+    try:
+        with st.spinner("Analyzing the retrieved regulatory evidence..."):
+            analysis = analyze_compliance(
+                business_description,
+                st.session_state.sources,
             )
 
+        st.session_state.analysis = analysis
+
+    except Exception as exc:
+        st.error(
+            "The compliance analysis could not be completed."
+        )
+        st.exception(exc)
         st.stop()
 
 
 # ============================================================
-# DISPLAY
+# RESULTS
 # ============================================================
 
-assessment = st.session_state.assessment
+analysis = st.session_state.analysis
 sources = st.session_state.sources
 topics = st.session_state.topics
 
 
-if assessment:
+if analysis:
 
-    overall_status = normalize_status(
-        assessment.get(
-            "overall_status",
-            "Needs Review",
-        )
+    st.markdown("## 📋 Compliance assessment")
+
+    counts = analysis.get(
+        "counts",
+        {
+            "Compliant": 0,
+            "Needs Review": 0,
+            "Action Required": 0,
+            "Not Applicable": 0,
+        },
     )
 
-    requirements = [
-        clean_requirement(req)
-        for req in assessment.get(
-            "requirements",
-            [],
-        )
-        if isinstance(req, dict)
-    ]
+    overall = analysis.get(
+        "overall_status",
+        "Needs Review",
+    )
 
-    next_steps = assessment.get(
-        "next_steps",
+    requirements = analysis.get(
+        "requirements",
         [],
     )
+
+    # --------------------------------------------------------
+    # STATUS CARDS
+    # --------------------------------------------------------
+
+    col1, col2, col3, col4 = st.columns(4)
+
+    with col1:
+        render_status_card(
+            "Overall",
+            f"{status_icon(overall)} {overall}",
+        )
+
+    with col2:
+        render_status_card(
+            "Requirements",
+            str(len(requirements)),
+        )
+
+    with col3:
+        render_status_card(
+            "Needs Review",
+            str(counts.get("Needs Review", 0)),
+        )
+
+    with col4:
+        render_status_card(
+            "Action Required",
+            str(counts.get("Action Required", 0)),
+        )
 
     # --------------------------------------------------------
     # SUMMARY
     # --------------------------------------------------------
 
     st.markdown(
-        '<div class="section-label">Assessment</div>',
+        '<div class="section-card">',
         unsafe_allow_html=True,
     )
 
-    st.subheader(
-        "📋 Compliance assessment"
+    st.markdown("### Assessment summary")
+
+    st.write(
+        analysis.get(
+            "summary",
+            "No summary was returned.",
+        )
     )
 
-    col1, col2, col3, col4 = st.columns(4)
-
-    compliant_count = sum(
-        r["status"] == "Compliant"
-        for r in requirements
+    st.markdown(
+        "</div>",
+        unsafe_allow_html=True,
     )
-
-    review_count = sum(
-        r["status"] == "Needs Review"
-        for r in requirements
-    )
-
-    action_count = sum(
-        r["status"] == "Action Required"
-        for r in requirements
-    )
-
-    with col1:
-
-        st.markdown(
-            f"""
-            <div class="status-card">
-                <div class="label">Overall</div>
-                <div class="value">
-                    {status_icon(overall_status)}
-                    {safe_text(overall_status)}
-                </div>
-            </div>
-            """,
-            unsafe_allow_html=True,
-        )
-
-    with col2:
-
-        st.markdown(
-            f"""
-            <div class="status-card">
-                <div class="label">Requirements</div>
-                <div class="value">
-                    {len(requirements)}
-                </div>
-            </div>
-            """,
-            unsafe_allow_html=True,
-        )
-
-    with col3:
-
-        st.markdown(
-            f"""
-            <div class="status-card">
-                <div class="label">Action Required</div>
-                <div class="value">
-                    {action_count}
-                </div>
-            </div>
-            """,
-            unsafe_allow_html=True,
-        )
-
-    with col4:
-
-        st.markdown(
-            f"""
-            <div class="status-card">
-                <div class="label">Needs Review</div>
-                <div class="value">
-                    {review_count}
-                </div>
-            </div>
-            """,
-            unsafe_allow_html=True,
-        )
 
     # --------------------------------------------------------
     # EVIDENCE COVERAGE
     # --------------------------------------------------------
 
     st.markdown(
-        f"""
-        <div class="coverage-card">
-            <strong>🔗 Evidence coverage</strong><br>
-            <span class="small-muted">
-                {len(requirements)} focused requirement
-                {"is" if len(requirements) == 1 else "s are"}
-                supported by {len(sources)} official source
-                {"." if len(sources) == 1 else "s."}
-                Findings are based only on evidence EcoComply
-                successfully retrieved.
-            </span>
+        '<div class="section-card">',
+        unsafe_allow_html=True,
+    )
+
+    st.markdown("### 📊 Evidence coverage")
+
+    st.write(
+        f"EcoComply evaluated **{len(requirements)} requirements** "
+        f"using **{len(sources)} retrieved official sources**."
+    )
+
+    validated_count = sum(
+        1
+        for requirement in requirements
+        if requirement.get("citation_validated")
+    )
+
+    st.caption(
+        f"{validated_count} of {len(requirements)} requirement citations "
+        "were matched to a retrieved source."
+    )
+
+    st.markdown(
+        "</div>",
+        unsafe_allow_html=True,
+    )
+
+    # --------------------------------------------------------
+    # HOW IT REACHED RESULTS
+    # --------------------------------------------------------
+
+    st.markdown("### 🔗 How EcoComply reached these results")
+
+    st.markdown(
+        """
+        <div class="evidence-box">
+            <strong>1. Business evidence</strong><br>
+            What the business description says it does.
+        </div>
+
+        <div class="evidence-box">
+            <strong>2. Regulatory evidence</strong><br>
+            What an official government source says, requires, or describes.
+        </div>
+
+        <div class="evidence-box">
+            <strong>3. Gap analysis</strong><br>
+            Whether the available business evidence establishes that requirement.
+        </div>
+
+        <div class="evidence-box">
+            <strong>4. Next step</strong><br>
+            What additional evidence or action would resolve the gap.
         </div>
         """,
         unsafe_allow_html=True,
     )
 
     # --------------------------------------------------------
-    # SUMMARY
-    # --------------------------------------------------------
-
-    st.markdown(
-        "### Summary"
-    )
-
-    st.write(
-        assessment.get(
-            "summary",
-            "No summary was returned.",
-        )
-    )
-
-    # --------------------------------------------------------
-    # EVIDENCE CHAIN
-    # --------------------------------------------------------
-
-    st.markdown(
-        "### 🧠 How EcoComply reached these results"
-    )
-
-    st.caption(
-        "EcoComply does not simply ask an AI model whether "
-        "the business is compliant. Each finding follows "
-        "an evidence chain."
-    )
-
-    chain1, chain2, chain3, chain4 = st.columns(4)
-
-    with chain1:
-
-        st.markdown(
-            """
-            **1. Business evidence**
-
-            What the business says it does.
-            """
-        )
-
-    with chain2:
-
-        st.markdown(
-            """
-            **2. Regulatory evidence**
-
-            What an official source says or requires.
-            """
-        )
-
-    with chain3:
-
-        st.markdown(
-            """
-            **3. Gap analysis**
-
-            Whether the available information establishes
-            the requirement.
-            """
-        )
-
-    with chain4:
-
-        st.markdown(
-            """
-            **4. Next step**
-
-            What information or action is appropriate next.
-            """
-        )
-
-    # --------------------------------------------------------
     # REQUIREMENTS
     # --------------------------------------------------------
 
-    st.markdown(
-        "### 📑 Regulatory requirements"
-    )
+    st.markdown("### Regulatory requirements")
 
     if not requirements:
-
-        st.warning(
-            "No specific requirements were produced "
-            "from the retrieved evidence."
+        st.info(
+            "No specific requirements were generated from the retrieved evidence."
         )
 
-    for req in requirements:
+    for number, requirement in enumerate(requirements, start=1):
 
-        status = req["status"]
+        name = requirement.get(
+            "name",
+            "Unnamed requirement",
+        )
+
+        status = normalize_status(
+            requirement.get(
+                "status",
+                "Needs Review",
+            )
+        )
+
+        citation = requirement.get(
+            "citation",
+            "Retrieved official source",
+        )
+
+        citation_validated = requirement.get(
+            "citation_validated",
+            False,
+        )
+
+        source_url = requirement.get(
+            "source_url",
+            "",
+        )
 
         st.markdown(
             f"""
             <div class="requirement-card">
-                <div class="requirement-title">
+                <h4>
+                    {number}. {escape_html(name)}
+                    &nbsp;
                     {status_icon(status)}
-                    {safe_text(req["title"])}
-                </div>
+                    {escape_html(status)}
+                </h4>
             </div>
             """,
             unsafe_allow_html=True,
         )
 
         st.markdown(
-            f"**Status:** {status}"
+            "**Requirement**"
         )
-
-        st.markdown(
-            f"**Requirement**  \n{req['requirement']}"
-        )
-
-        st.markdown(
-            f"**Citation**  \n`{req['citation']}`"
-        )
-
-        evidence_col, business_col = st.columns(2)
-
-        with evidence_col:
-
-            st.markdown(
-                "#### 📜 Regulatory evidence"
-            )
-
-            st.markdown(
-                f"""
-                <div class="evidence-box">
-                    {safe_text(req["regulatory_evidence"])}
-                </div>
-                """,
-                unsafe_allow_html=True,
-            )
-
-        with business_col:
-
-            st.markdown(
-                "#### 🏢 Business evidence"
-            )
-
-            st.markdown(
-                f"""
-                <div class="evidence-box">
-                    {safe_text(req["business_evidence"])}
-                </div>
-                """,
-                unsafe_allow_html=True,
-            )
-
-        st.markdown(
-            "#### 🔍 Why EcoComply flagged this"
-        )
-
         st.write(
-            req["why_flagged"]
+            requirement.get(
+                "requirement",
+                "No requirement description returned.",
+            )
         )
 
         st.markdown(
-            "#### ➡️ Recommended action"
+            "**Citation**"
         )
 
-        st.write(
-            req["recommended_action"]
-        )
-
-        if req["source_url"]:
-
+        if citation_validated and source_url:
             st.markdown(
-                f"[🔗 Open official source]({req['source_url']})"
+                f"[{citation}]({source_url})"
+            )
+        else:
+            st.warning(
+                "EcoComply could not validate this citation against "
+                "the retrieved source list."
             )
 
-        st.divider()
+        st.markdown(
+            "**Regulatory evidence**"
+        )
+        st.write(
+            requirement.get(
+                "regulatory_evidence",
+                "No regulatory evidence explanation returned.",
+            )
+        )
+
+        st.markdown(
+            "**Business evidence**"
+        )
+        st.write(
+            requirement.get(
+                "business_evidence",
+                "No business evidence was provided.",
+            )
+        )
+
+        st.markdown(
+            "**Why flagged**"
+        )
+        st.write(
+            requirement.get(
+                "why_flagged",
+                "No explanation returned.",
+            )
+        )
+
+        st.markdown(
+            "**Recommended next step**"
+        )
+        st.write(
+            requirement.get(
+                "recommended_action",
+                "Obtain additional evidence before drawing a conclusion.",
+            )
+        )
 
     # --------------------------------------------------------
-    # NEXT STEPS
+    # ACTION PLAN
     # --------------------------------------------------------
 
-    st.markdown(
-        '<div class="section-label">Action plan</div>',
-        unsafe_allow_html=True,
+    next_steps = analysis.get(
+        "next_steps",
+        [],
     )
 
-    st.subheader(
-        "➡️ Recommended next steps"
-    )
+    st.markdown("### 🛠️ Action plan")
 
     if next_steps:
-
         for step in next_steps:
-
-            st.markdown(
-                f"""
-                <div class="next-step">
-                    {safe_text(step)}
-                </div>
-                """,
-                unsafe_allow_html=True,
-            )
-
+            st.markdown(f"- {step}")
     else:
-
-        st.info(
+        st.write(
             "No additional next steps were generated."
         )
 
@@ -1929,220 +1634,156 @@ if assessment:
     # SOURCES
     # --------------------------------------------------------
 
-    st.markdown(
-        '<div class="section-label">Evidence</div>',
-        unsafe_allow_html=True,
-    )
-
-    st.subheader(
-        "🔗 Retrieved official sources"
-    )
-
-    st.caption(
-        "These are the official sources EcoComply actually "
-        "retrieved. Only selected relevant passages were "
-        "sent to the analysis engine."
-    )
+    st.markdown("### 📚 Retrieved official sources")
 
     for source in sources:
 
-        score = source.get(
-            "relevance_score",
-            0,
+        authority = authority_label(
+            source.get("authority", 1)
         )
 
         st.markdown(
             f"""
             <div class="source-card">
-                <div class="source-type">
-                    {safe_text(source["source_type"])}
-                </div>
-                <div class="source-title">
-                    {safe_text(source["name"])}
-                </div>
-                <div class="source-score">
-                    Topic: {safe_text(source["topic"])} ·
-                    Retrieval relevance: {score}
-                </div>
+                <strong>{escape_html(source["title"])}</strong><br>
+                <span class="tag tag-official">Official source</span>
+                <span class="tag tag-regulation">
+                    {escape_html(authority)}
+                </span>
+                <br><br>
+                <span class="small-muted">
+                    Topic: {escape_html(source["topic"])}
+                    · Retrieval score: {source["score"]}
+                </span>
             </div>
             """,
             unsafe_allow_html=True,
-        )
-
-        st.caption(
-            "Retrieval relevance is used to rank sources. "
-            "It is not a compliance score or confidence percentage."
         )
 
         st.markdown(
             f"[Open official source]({source['url']})"
         )
 
-        with st.expander(
-            "View evidence used by EcoComply"
-        ):
-
-            st.write(
-                source["evidence"]
-            )
+        with st.expander("View retrieved evidence"):
+            st.write(source["evidence"])
 
     # --------------------------------------------------------
     # EXPORT
     # --------------------------------------------------------
 
-    st.markdown(
-        '<div class="section-label">Export</div>',
-        unsafe_allow_html=True,
-    )
-
-    st.subheader(
-        "🧾 Structured assessment data"
-    )
-
-    export_business_description = (
-        st.session_state.get(
-            "business_description",
-            "",
-        )
-    )
+    st.markdown("### 💾 Export")
 
     export_data = {
-        "application": "EcoComply",
-        "assessment_type": (
-            "Preliminary educational compliance research"
-        ),
-        "business_description": export_business_description,
+        "app": "EcoComply",
+        "business_description": business_description,
         "targeted_topics": topics,
+        "overall_status": overall,
+        "requirements": requirements,
+        "next_steps": next_steps,
         "retrieved_sources": [
             {
-                "name": source["name"],
+                "title": source["title"],
                 "url": source["url"],
-                "source_type": source["source_type"],
                 "topic": source["topic"],
-                "relevance_score": source[
-                    "relevance_score"
-                ],
-                "evidence": source[
-                    "evidence"
-                ],
+                "authority": source["authority"],
+                "retrieval_score": source["score"],
+                "evidence": source["evidence"],
             }
             for source in sources
         ],
-        "assessment": assessment,
     }
 
-    json_data = json.dumps(
-        export_data,
-        indent=2,
-        ensure_ascii=False,
-    )
-
     st.download_button(
-        label="⬇️ Download assessment JSON",
-        data=json_data,
+        "Download assessment JSON",
+        data=json.dumps(
+            export_data,
+            indent=2,
+        ),
         file_name="ecocomply_assessment.json",
         mime="application/json",
+        use_container_width=True,
     )
-
-    with st.expander(
-        "View raw JSON"
-    ):
-
-        st.code(
-            json_data,
-            language="json",
-        )
 
     # --------------------------------------------------------
     # LIMITATIONS
     # --------------------------------------------------------
 
-    st.markdown(
-        '<div class="section-label">Transparency</div>',
-        unsafe_allow_html=True,
+    st.markdown("### ⚠️ Important limitations")
+
+    st.info(
+        "EcoComply provides a preliminary educational assessment based "
+        "on the business information and official sources it retrieved. "
+        "It does not establish legal compliance, replace professional "
+        "environmental or legal advice, or guarantee that every "
+        "requirement applicable to a facility has been identified."
     )
 
-    st.subheader(
-        "⚠️ Limitations"
-    )
 
-    st.markdown(
-        """
-        - EcoComply evaluates requirements supported by the
-          official regulatory evidence it successfully retrieves.
-        - Applicability can depend on details such as facility
-          size, materials used, quantities, emissions, waste
-          classification, permits, and operating practices.
-        - Mentioning an activity does not automatically establish
-          that every related regulatory requirement applies.
-        - A "Compliant" result means the provided information
-          appears to satisfy the specific supported requirement.
-          It is not a legal determination.
-        - "Needs Review" means the available evidence is not
-          sufficient to establish whether the requirement is met.
-        - "Action Required" is reserved for situations where the
-          supplied evidence indicates a specific requirement is
-          not being met.
-        - EcoComply does not replace professional legal or
-          environmental compliance advice.
-        """
-    )
+# ============================================================
+# LANDING PAGE
+# ============================================================
 
 else:
 
-    # ========================================================
-    # LANDING PAGE
-    # ========================================================
-
-    st.markdown(
-        "### Start a compliance assessment"
-    )
-
-    st.write(
-        "Describe a business in the sidebar, then run "
-        "EcoComply's regulatory research."
-    )
-
-    st.info(
-        "EcoComply retrieves regulatory information from "
-        "curated official sources such as the eCFR, EPA, "
-        "and Michigan EGLE."
-    )
-
     st.markdown(
         """
-        **What makes EcoComply different**
+        <div class="section-card">
+            <h3>How it works</h3>
 
-        **🔎 Evidence retrieval**  
-        Official regulatory pages are retrieved instead of
-        relying solely on the model's existing knowledge.
+            <p>
+                <strong>1. Describe the business</strong><br>
+                Tell EcoComply what the business does, what materials it
+                uses, and what wastes or emissions it produces.
+            </p>
 
-        **📜 Traceable requirements**  
-        Findings are tied to specific regulatory citations
-        and source pages.
+            <p>
+                <strong>2. Retrieve official sources</strong><br>
+                EcoComply searches a controlled catalog of official
+                eCFR, EPA, and Michigan EGLE sources.
+            </p>
 
-        **🧠 Evidence-based analysis**  
-        The AI receives selected regulatory evidence and
-        compares it against the business description.
+            <p>
+                <strong>3. Extract evidence</strong><br>
+                Relevant passages are selected locally before they are
+                sent to the AI, keeping the analysis focused.
+            </p>
 
-        **⚠️ Uncertainty handling**  
-        When the information is insufficient, EcoComply
-        says **Needs Review** instead of pretending to know.
+            <p>
+                <strong>4. Analyze the gaps</strong><br>
+                EcoComply compares the business evidence against the
+                retrieved regulatory evidence.
+            </p>
 
-        **➡️ Actionable results**  
-        Each finding includes a recommended evidence-supported
-        next step.
-        """
-    )
-
-    st.markdown(
-        """
-        <div class="disclaimer">
-            <strong>Important:</strong>
-            EcoComply provides a preliminary educational
-            assessment. It does not replace professional
-            legal or environmental compliance advice.
+            <p>
+                <strong>5. Show the evidence trail</strong><br>
+                Every generated requirement is connected to the
+                retrieved source used to support it.
+            </p>
         </div>
         """,
         unsafe_allow_html=True,
+    )
+
+    st.markdown(
+        "### 🧭 Evidence hierarchy"
+    )
+
+    st.markdown(
+        """
+        EcoComply prioritizes sources in this order:
+
+        **Direct regulation → Official agency guidance → General overview**
+
+        This helps prevent a broad informational page from being treated
+        as if it were the exact legal text of a requirement.
+        """
+    )
+
+    st.markdown(
+        "### 🚀 Ready to research?"
+    )
+
+    st.write(
+        "Choose a business profile or enter your own description in the "
+        "sidebar, then select **Research compliance**."
     )

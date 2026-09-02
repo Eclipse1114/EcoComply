@@ -1,11 +1,73 @@
-import html
 import json
 import os
 import re
-from urllib.parse import quote_plus, urljoin
+import html
+import subprocess
+import sys
+from urllib.parse import quote_plus, urljoin, urlparse
+
 import streamlit as st
 from groq import Groq
 from playwright.sync_api import sync_playwright
+
+
+# =========================================================
+# PLAYWRIGHT CONFIGURATION
+# =========================================================
+
+# Explicitly tell Playwright where its browser binaries live.
+# This makes the installer and browser launcher use the same location.
+PLAYWRIGHT_BROWSER_PATH = os.path.expanduser("~/.cache/ms-playwright")
+os.environ["PLAYWRIGHT_BROWSERS_PATH"] = PLAYWRIGHT_BROWSER_PATH
+
+
+def ensure_playwright_browser():
+    """
+    Make sure Playwright's Chromium headless shell is installed.
+
+    Streamlit Community Cloud installs the Python Playwright package
+    from requirements.txt, but the browser binary is separate.
+    """
+
+    os.makedirs(PLAYWRIGHT_BROWSER_PATH, exist_ok=True)
+
+    # Ask Playwright itself which executable it expects.
+    with sync_playwright() as p:
+        executable = p.chromium.executable_path
+
+    # If the executable already exists, we're ready.
+    if os.path.exists(executable):
+        return
+
+    st.info("First-time setup: installing the Chromium browser used by EcoComply...")
+
+    result = subprocess.run(
+        [
+            sys.executable,
+            "-m",
+            "playwright",
+            "install",
+            "--only-shell",
+            "chromium",
+        ],
+        capture_output=True,
+        text=True,
+    )
+
+    if result.returncode != 0:
+        raise RuntimeError(
+            "Playwright could not install Chromium.\n\n"
+            f"STDOUT:\n{result.stdout}\n\n"
+            f"STDERR:\n{result.stderr}"
+        )
+
+    # Verify that the browser actually appeared.
+    if not os.path.exists(executable):
+        raise RuntimeError(
+            "Playwright reported that Chromium was installed, "
+            "but the expected browser executable could not be found:\n"
+            f"{executable}"
+        )
 
 
 # =========================================================
@@ -31,17 +93,17 @@ MAX_SOURCES = 8
 OFFICIAL_SOURCES = {
     "eCFR": "https://www.ecfr.gov/",
     "EPA": "https://www.epa.gov/laws-regulations",
-    "Michigan EGLE": "https://www.michigan.gov/egle/regulatory-assistance/regulations",
+    "Michigan EGLE": (
+        "https://www.michigan.gov/egle/regulatory-assistance/regulations"
+    ),
 }
+
 
 # Only allow EcoComply to retrieve from official regulatory domains.
 ALLOWED_DOMAINS = {
     "ecfr.gov",
-    "www.ecfr.gov",
     "epa.gov",
-    "www.epa.gov",
     "michigan.gov",
-    "www.michigan.gov",
 }
 
 
@@ -56,6 +118,7 @@ if not groq_key:
         groq_key = st.secrets["GROQ_API_KEY"]
     except Exception:
         groq_key = None
+
 
 if groq_key:
     client = Groq(api_key=groq_key)
@@ -303,6 +366,11 @@ IMPORTANT RULES:
    explicitly say that no verified program was identified instead of
    inventing one.
 
+13. Do not treat general EPA informational pages as proof that a specific
+   regulation applies.
+
+14. Prefer specific regulatory text over general informational material.
+
 Return ONLY valid JSON using this schema:
 
 {
@@ -341,22 +409,23 @@ Return ONLY valid JSON using this schema:
 # =========================================================
 
 def clean_text(text: str) -> str:
-    """Normalize whitespace while preserving readable paragraph structure."""
+    """Normalize whitespace while preserving readable text."""
+
     if not text:
         return ""
 
     text = re.sub(r"\s+", " ", text)
+
     return text.strip()
 
 
 def is_allowed_url(url: str) -> bool:
     """Only permit official regulatory domains."""
+
     if not url:
         return False
 
     try:
-        from urllib.parse import urlparse
-
         hostname = urlparse(url).hostname
 
         if not hostname:
@@ -366,7 +435,10 @@ def is_allowed_url(url: str) -> bool:
 
         return (
             hostname in ALLOWED_DOMAINS
-            or any(hostname.endswith("." + domain) for domain in ALLOWED_DOMAINS)
+            or any(
+                hostname.endswith("." + domain)
+                for domain in ALLOWED_DOMAINS
+            )
         )
 
     except Exception:
@@ -375,6 +447,7 @@ def is_allowed_url(url: str) -> bool:
 
 def safe_url(url: str) -> str:
     """Return a URL only if it belongs to an approved domain."""
+
     if is_allowed_url(url):
         return url
 
@@ -384,18 +457,32 @@ def safe_url(url: str) -> str:
 def extract_cfr_references(text: str) -> list[str]:
     """
     Pull likely CFR references from retrieved text.
-    Example:
+
+    Examples:
     40 CFR 262.15
     40 CFR § 63.111
     """
-    pattern = r"\b\d+\s*CFR\s*(?:§\s*)?\d+(?:\.\d+)*\b"
 
-    matches = re.findall(pattern, text, flags=re.IGNORECASE)
+    pattern = (
+        r"\b\d+\s+CFR\s+(?:§\s*)?"
+        r"\d+(?:\.\d+)*\b"
+    )
+
+    matches = re.findall(
+        pattern,
+        text,
+        flags=re.IGNORECASE,
+    )
 
     cleaned = []
 
     for match in matches:
-        normalized = re.sub(r"\s+", " ", match).strip()
+
+        normalized = re.sub(
+            r"\s+",
+            " ",
+            match,
+        ).strip()
 
         if normalized not in cleaned:
             cleaned.append(normalized)
@@ -403,12 +490,11 @@ def extract_cfr_references(text: str) -> list[str]:
     return cleaned
 
 
-def keyword_list(business_description: str) -> list[str]:
+def keyword_list(
+    business_description: str,
+) -> list[str]:
     """
-    Convert the business description into search concepts.
-
-    These are intentionally broad because the official websites determine
-    which regulatory material is actually relevant.
+    Convert the business description into broad regulatory concepts.
     """
 
     description = business_description.lower()
@@ -416,6 +502,7 @@ def keyword_list(business_description: str) -> list[str]:
     concepts = []
 
     keyword_groups = {
+
         "hazardous waste": [
             "hazardous waste",
             "waste",
@@ -426,6 +513,7 @@ def keyword_list(business_description: str) -> list[str]:
             "lacquer",
             "stripper",
         ],
+
         "air emissions": [
             "paint",
             "spray",
@@ -438,6 +526,7 @@ def keyword_list(business_description: str) -> list[str]:
             "volatile organic",
             "voc",
         ],
+
         "wastewater": [
             "wastewater",
             "sewer",
@@ -446,6 +535,7 @@ def keyword_list(business_description: str) -> list[str]:
             "grease",
             "water",
         ],
+
         "solid waste": [
             "trash",
             "food waste",
@@ -453,6 +543,7 @@ def keyword_list(business_description: str) -> list[str]:
             "sawdust",
             "solid waste",
         ],
+
         "chemical storage": [
             "chemical",
             "solvent",
@@ -464,11 +555,17 @@ def keyword_list(business_description: str) -> list[str]:
     }
 
     for concept, keywords in keyword_groups.items():
-        if any(keyword in description for keyword in keywords):
+
+        if any(
+            keyword in description
+            for keyword in keywords
+        ):
             concepts.append(concept)
 
     if not concepts:
-        concepts.append("environmental compliance small business")
+        concepts.append(
+            "environmental compliance small business"
+        )
 
     return concepts[:5]
 
@@ -477,12 +574,13 @@ def keyword_list(business_description: str) -> list[str]:
 # PLAYWRIGHT RETRIEVAL
 # =========================================================
 
-def retrieve_ecfr_sources(page, query: str) -> list[dict]:
+def retrieve_ecfr_sources(
+    page,
+    query: str,
+) -> list[dict]:
+
     """
     Search eCFR using its public search interface.
-
-    eCFR is an official federal regulatory resource, although eCFR itself
-    describes its online version as an unofficial editorial compilation.
     """
 
     results = []
@@ -493,6 +591,7 @@ def retrieve_ecfr_sources(page, query: str) -> list[dict]:
     )
 
     try:
+
         page.goto(
             search_url,
             wait_until="domcontentloaded",
@@ -506,14 +605,21 @@ def retrieve_ecfr_sources(page, query: str) -> list[dict]:
         seen = set()
 
         for link in links:
+
             try:
+
                 href = link.get_attribute("href")
-                title = clean_text(link.inner_text())
+                title = clean_text(
+                    link.inner_text()
+                )
 
                 if not href or not title:
                     continue
 
-                full_url = urljoin("https://www.ecfr.gov/", href)
+                full_url = urljoin(
+                    "https://www.ecfr.gov/",
+                    href,
+                )
 
                 if not is_allowed_url(full_url):
                     continue
@@ -546,13 +652,19 @@ def retrieve_ecfr_sources(page, query: str) -> list[dict]:
     return results
 
 
-def retrieve_official_page(page, url: str, source_name: str) -> dict | None:
+def retrieve_official_page(
+    page,
+    url: str,
+    source_name: str,
+) -> dict | None:
+
     """Open an official page and extract readable text."""
 
     if not is_allowed_url(url):
         return None
 
     try:
+
         page.goto(
             url,
             wait_until="domcontentloaded",
@@ -561,24 +673,33 @@ def retrieve_official_page(page, url: str, source_name: str) -> dict | None:
 
         page.wait_for_timeout(1000)
 
-        title = clean_text(page.title())
+        title = clean_text(
+            page.title()
+        )
 
-        body_text = page.locator("body").inner_text()
+        body_text = page.locator(
+            "body"
+        ).inner_text()
 
-        body_text = clean_text(body_text)
+        body_text = clean_text(
+            body_text
+        )
 
         if not body_text:
             return None
 
-        # Avoid feeding giant websites to the model.
-        body_text = body_text[:MAX_SOURCE_CHARS]
+        body_text = body_text[
+            :MAX_SOURCE_CHARS
+        ]
 
         return {
             "source": source_name,
             "title": title[:300],
             "url": url,
             "text": body_text,
-            "cfr_references": extract_cfr_references(body_text),
+            "cfr_references": extract_cfr_references(
+                body_text
+            ),
         }
 
     except Exception:
@@ -588,15 +709,19 @@ def retrieve_official_page(page, url: str, source_name: str) -> dict | None:
 def retrieve_regulatory_evidence(
     business_description: str,
 ) -> tuple[list[dict], list[str]]:
+
     """
     Main evidence-retrieval pipeline.
-
-    Returns:
-        evidence
-        retrieval_status
     """
 
-    concepts = keyword_list(business_description)
+    # IMPORTANT:
+    # Make absolutely certain the browser exists BEFORE
+    # attempting to launch it.
+    ensure_playwright_browser()
+
+    concepts = keyword_list(
+        business_description
+    )
 
     evidence = []
     retrieval_status = []
@@ -624,11 +749,14 @@ def retrieve_regulatory_evidence(
         # eCFR
         # -------------------------------------------------
 
-        retrieval_status.append("Searching eCFR...")
+        retrieval_status.append(
+            "Searching eCFR..."
+        )
 
         ecfr_results = []
 
         for concept in concepts:
+
             ecfr_results.extend(
                 retrieve_ecfr_sources(
                     page,
@@ -642,13 +770,19 @@ def retrieve_regulatory_evidence(
         seen_urls = set()
 
         for result in ecfr_results:
+
             if result["url"] in seen_urls:
                 continue
 
-            seen_urls.add(result["url"])
-            unique_ecfr.append(result)
+            seen_urls.add(
+                result["url"]
+            )
 
-        # Retrieve the actual regulation pages.
+            unique_ecfr.append(
+                result
+            )
+
+        # Retrieve actual regulation pages.
         for result in unique_ecfr[:5]:
 
             page_data = retrieve_official_page(
@@ -658,18 +792,29 @@ def retrieve_regulatory_evidence(
             )
 
             if page_data:
-                evidence.append(page_data)
+                evidence.append(
+                    page_data
+                )
 
-        if any(item["source"] == "eCFR" for item in evidence):
-            retrieval_status.append("✓ eCFR evidence retrieved")
+        if any(
+            item["source"] == "eCFR"
+            for item in evidence
+        ):
+            retrieval_status.append(
+                "✓ eCFR evidence retrieved"
+            )
         else:
-            retrieval_status.append("⚠ eCFR search returned no usable evidence")
+            retrieval_status.append(
+                "⚠ eCFR search returned no usable evidence"
+            )
 
         # -------------------------------------------------
         # EPA
         # -------------------------------------------------
 
-        retrieval_status.append("Checking EPA...")
+        retrieval_status.append(
+            "Checking EPA..."
+        )
 
         epa_page = retrieve_official_page(
             page,
@@ -678,17 +823,30 @@ def retrieve_regulatory_evidence(
         )
 
         if epa_page:
-            evidence.append(epa_page)
-            retrieval_status.append("✓ EPA regulatory information retrieved")
+
+            evidence.append(
+                epa_page
+            )
+
+            retrieval_status.append(
+                "✓ EPA regulatory information retrieved"
+            )
+
         else:
-            retrieval_status.append("⚠ EPA page could not be retrieved")
+
+            retrieval_status.append(
+                "⚠ EPA page could not be retrieved"
+            )
 
         # -------------------------------------------------
         # Michigan EGLE
         # -------------------------------------------------
 
         if "michigan" in business_description.lower():
-            retrieval_status.append("Checking Michigan EGLE...")
+
+            retrieval_status.append(
+                "Checking Michigan EGLE..."
+            )
 
             egle_page = retrieve_official_page(
                 page,
@@ -697,11 +855,17 @@ def retrieve_regulatory_evidence(
             )
 
             if egle_page:
-                evidence.append(egle_page)
+
+                evidence.append(
+                    egle_page
+                )
+
                 retrieval_status.append(
                     "✓ Michigan EGLE regulatory information retrieved"
                 )
+
             else:
+
                 retrieval_status.append(
                     "⚠ Michigan EGLE page could not be retrieved"
                 )
@@ -710,7 +874,7 @@ def retrieve_regulatory_evidence(
         browser.close()
 
     # -----------------------------------------------------
-    # Deduplicate and limit evidence
+    # Deduplicate evidence
     # -----------------------------------------------------
 
     unique_evidence = []
@@ -729,24 +893,38 @@ def retrieve_regulatory_evidence(
 
         seen.add(key)
 
-        unique_evidence.append(item)
+        unique_evidence.append(
+            item
+        )
 
-    return unique_evidence[:MAX_SOURCES], retrieval_status
+    return (
+        unique_evidence[:MAX_SOURCES],
+        retrieval_status,
+    )
 
 
 # =========================================================
 # AI ANALYSIS
 # =========================================================
 
-def build_evidence_packet(evidence: list[dict]) -> str:
+def build_evidence_packet(
+    evidence: list[dict],
+) -> str:
+
     """Convert retrieved pages into a compact evidence packet."""
 
     if not evidence:
-        return "NO REGULATORY EVIDENCE WAS SUCCESSFULLY RETRIEVED."
+        return (
+            "NO REGULATORY EVIDENCE WAS "
+            "SUCCESSFULLY RETRIEVED."
+        )
 
     sections = []
 
-    for index, item in enumerate(evidence, start=1):
+    for index, item in enumerate(
+        evidence,
+        start=1,
+    ):
 
         section = f"""
 SOURCE {index}
@@ -761,9 +939,13 @@ RETRIEVED TEXT:
 {item.get("text", "")}
 """
 
-        sections.append(section)
+        sections.append(
+            section
+        )
 
-    return "\n\n".join(sections)
+    return "\n\n".join(
+        sections
+    )
 
 
 @st.cache_data(
@@ -776,13 +958,18 @@ def generate_compliance_report(
 ) -> dict:
 
     if not client:
+
         raise RuntimeError(
             "GROQ_API_KEY is not configured."
         )
 
-    evidence = json.loads(evidence_json)
+    evidence = json.loads(
+        evidence_json
+    )
 
-    evidence_packet = build_evidence_packet(evidence)
+    evidence_packet = build_evidence_packet(
+        evidence
+    )
 
     user_prompt = f"""
 BUSINESS PROFILE
@@ -838,16 +1025,26 @@ determination.
 
     raw = response.choices[0].message.content
 
-    report = json.loads(raw)
+    report = json.loads(
+        raw
+    )
 
-    return normalize_report(report)
+    return normalize_report(
+        report
+    )
 
 
-def normalize_report(report: dict) -> dict:
+def normalize_report(
+    report: dict,
+) -> dict:
+
     """Ensure the model response has the expected structure."""
 
     if not isinstance(report, dict):
-        raise ValueError("AI returned an invalid report.")
+
+        raise ValueError(
+            "AI returned an invalid report."
+        )
 
     report.setdefault(
         "business_type",
@@ -900,7 +1097,10 @@ def normalize_report(report: dict) -> dict:
 
     for requirement in report["requirements"]:
 
-        if not isinstance(requirement, dict):
+        if not isinstance(
+            requirement,
+            dict,
+        ):
             continue
 
         status = requirement.get(
@@ -955,7 +1155,9 @@ def normalize_report(report: dict) -> dict:
             }
         )
 
-    report["requirements"] = cleaned_requirements
+    report["requirements"] = (
+        cleaned_requirements
+    )
 
     return report
 
@@ -964,7 +1166,9 @@ def normalize_report(report: dict) -> dict:
 # UI HELPERS
 # =========================================================
 
-def status_html(status: str) -> str:
+def status_html(
+    status: str,
+) -> str:
 
     classes = {
         "Compliant": "status-compliant",
@@ -985,7 +1189,9 @@ def status_html(status: str) -> str:
     )
 
 
-def count_statuses(requirements: list[dict]) -> dict:
+def count_statuses(
+    requirements: list[dict],
+) -> dict:
 
     counts = {
         "Compliant": 0,
@@ -996,7 +1202,9 @@ def count_statuses(requirements: list[dict]) -> dict:
 
     for item in requirements:
 
-        status = item.get("status")
+        status = item.get(
+            "status"
+        )
 
         if status in counts:
             counts[status] += 1
@@ -1071,6 +1279,7 @@ def build_markdown_report(
         "next_steps",
         [],
     ):
+
         lines.append(
             f"- [ ] {step}"
         )
@@ -1101,6 +1310,7 @@ def build_markdown_report(
         "limitations",
         [],
     ):
+
         lines.append(
             f"- {limitation}"
         )
@@ -1110,13 +1320,15 @@ def build_markdown_report(
             "",
             "---",
             "",
-            "EcoComply provides a preliminary educational assessment and "
-            "does not replace professional legal, environmental, or "
-            "regulatory advice.",
+            "EcoComply provides a preliminary educational assessment "
+            "and does not replace professional legal, environmental, "
+            "or regulatory advice.",
         ]
     )
 
-    return "\n".join(lines)
+    return "\n".join(
+        lines
+    )
 
 
 # =========================================================
@@ -1125,9 +1337,13 @@ def build_markdown_report(
 
 with st.sidebar:
 
-    st.header("🏢 Business Profile")
+    st.header(
+        "🏢 Business Profile"
+    )
 
-    st.subheader("Quick Presets")
+    st.subheader(
+        "Quick Presets"
+    )
 
     preset = st.selectbox(
         "Choose a test profile:",
@@ -1140,6 +1356,7 @@ with st.sidebar:
     )
 
     preset_texts = {
+
         "Auto Body Shop (Paint & Solvents)": (
             "I run an auto body shop in Michigan. "
             "We spray paint 5 cars a week using solvent-based paints "
@@ -1187,7 +1404,9 @@ with st.sidebar:
 
     st.markdown("---")
 
-    st.subheader("🔎 Evidence Sources")
+    st.subheader(
+        "🔎 Evidence Sources"
+    )
 
     st.caption(
         "EcoComply restricts automated regulatory retrieval "
@@ -1259,6 +1478,7 @@ if submit_btn:
                     st.write(status_line)
 
                 if evidence:
+
                     research_status.update(
                         label=(
                             f"✓ Retrieved {len(evidence)} "
@@ -1266,9 +1486,13 @@ if submit_btn:
                         ),
                         state="complete",
                     )
+
                 else:
+
                     research_status.update(
-                        label="⚠ No usable regulatory evidence found",
+                        label=(
+                            "⚠ No usable regulatory evidence found"
+                        ),
                         state="error",
                     )
 
@@ -1345,7 +1569,9 @@ if submit_btn:
 
 if "report" in st.session_state:
 
-    report = st.session_state["report"]
+    report = st.session_state[
+        "report"
+    ]
 
     requirements = report.get(
         "requirements",
@@ -1377,7 +1603,10 @@ if "report" in st.session_state:
         unsafe_allow_html=True,
     )
 
-    st.markdown("<br>", unsafe_allow_html=True)
+    st.markdown(
+        "<br>",
+        unsafe_allow_html=True,
+    )
 
     # -----------------------------------------------------
     # METRICS
@@ -1386,6 +1615,7 @@ if "report" in st.session_state:
     col1, col2, col3, col4 = st.columns(4)
 
     with col1:
+
         st.markdown(
             f"""
             <div class="metric-card">
@@ -1401,6 +1631,7 @@ if "report" in st.session_state:
         )
 
     with col2:
+
         st.markdown(
             f"""
             <div class="metric-card">
@@ -1416,6 +1647,7 @@ if "report" in st.session_state:
         )
 
     with col3:
+
         st.markdown(
             f"""
             <div class="metric-card">
@@ -1431,6 +1663,7 @@ if "report" in st.session_state:
         )
 
     with col4:
+
         st.markdown(
             f"""
             <div class="metric-card">
@@ -1445,13 +1678,18 @@ if "report" in st.session_state:
             unsafe_allow_html=True,
         )
 
-    st.markdown("<br>", unsafe_allow_html=True)
+    st.markdown(
+        "<br>",
+        unsafe_allow_html=True,
+    )
 
     # -----------------------------------------------------
     # SUMMARY
     # -----------------------------------------------------
 
-    st.subheader("📋 Executive Summary")
+    st.subheader(
+        "📋 Executive Summary"
+    )
 
     st.markdown(
         f"""
@@ -1505,7 +1743,9 @@ if "report" in st.session_state:
                 unsafe_allow_html=True,
             )
 
-            st.markdown("### What the regulation requires")
+            st.markdown(
+                "### What the regulation requires"
+            )
 
             st.write(
                 requirement.get(
@@ -1514,7 +1754,9 @@ if "report" in st.session_state:
                 )
             )
 
-            st.markdown("### Why EcoComply reached this result")
+            st.markdown(
+                "### Why EcoComply reached this result"
+            )
 
             st.write(
                 requirement.get(
@@ -1523,7 +1765,9 @@ if "report" in st.session_state:
                 )
             )
 
-            st.markdown("### Business evidence")
+            st.markdown(
+                "### Business evidence"
+            )
 
             st.info(
                 requirement.get(
@@ -1532,7 +1776,9 @@ if "report" in st.session_state:
                 )
             )
 
-            st.markdown("### Recommended action")
+            st.markdown(
+                "### Recommended action"
+            )
 
             st.write(
                 requirement.get(
@@ -1698,13 +1944,17 @@ if "report" in st.session_state:
                 )
             )
 
-            st.link_button(
-                "Open Source",
-                source.get(
-                    "url",
-                    "",
-                ),
+            source_url = source.get(
+                "url",
+                "",
             )
+
+            if source_url:
+
+                st.link_button(
+                    "Open Source",
+                    source_url,
+                )
 
             references = source.get(
                 "cfr_references",
@@ -1718,7 +1968,10 @@ if "report" in st.session_state:
                 )
 
                 for reference in references:
-                    st.code(reference)
+
+                    st.code(
+                        reference
+                    )
 
     # -----------------------------------------------------
     # RAW JSON
@@ -1737,46 +1990,31 @@ if "report" in st.session_state:
         )
 
     # -----------------------------------------------------
-    # EXPORT
+    # DOWNLOADS
     # -----------------------------------------------------
-
-    st.subheader(
-        "📥 Export"
-    )
 
     markdown_report = build_markdown_report(
         report,
-        st.session_state.get(
-            "last_business_description",
-            user_input if "user_input" in locals() else "",
-        ),
+        user_input if "user_input" in locals() else "",
     )
 
-    col1, col2 = st.columns(2)
+    st.download_button(
+        "⬇️ Download Markdown Report",
+        data=markdown_report,
+        file_name="ecocomply_report.md",
+        mime="text/markdown",
+    )
 
-    with col1:
-
-        st.download_button(
-            label="📄 Download Markdown Report",
-            data=markdown_report,
-            file_name="EcoComply_Assessment.md",
-            mime="text/markdown",
-            use_container_width=True,
-        )
-
-    with col2:
-
-        st.download_button(
-            label="🧩 Download JSON Report",
-            data=json.dumps(
-                report,
-                indent=2,
-                ensure_ascii=False,
-            ),
-            file_name="EcoComply_Assessment.json",
-            mime="application/json",
-            use_container_width=True,
-        )
+    st.download_button(
+        "⬇️ Download JSON Report",
+        data=json.dumps(
+            report,
+            indent=2,
+            ensure_ascii=False,
+        ),
+        file_name="ecocomply_report.json",
+        mime="application/json",
+    )
 
     # -----------------------------------------------------
     # DISCLAIMER
@@ -1785,12 +2023,11 @@ if "report" in st.session_state:
     st.markdown(
         """
         <div class="disclaimer">
-        <strong>Important:</strong>
-        EcoComply provides a preliminary educational assessment based on
-        the business information supplied and the official sources it was
-        able to retrieve. It does not replace professional legal,
-        environmental, engineering, or regulatory advice.
+        <strong>Important:</strong> EcoComply provides a preliminary
+        educational assessment based on the information supplied by the
+        user and the regulatory material it retrieves. It does not replace
+        professional legal, environmental, or regulatory advice.
         </div>
         """,
         unsafe_allow_html=True,
-)
+    )

@@ -1,4 +1,6 @@
+```python
 import json
+import os
 import re
 import subprocess
 import sys
@@ -78,7 +80,7 @@ st.markdown(
         }
 
         .status-card .value {
-            font-size: 1.7rem;
+            font-size: 1.55rem;
             font-weight: 750;
             margin-top: 0.3rem;
         }
@@ -156,11 +158,6 @@ st.markdown(
             padding: 1rem;
             margin: 1rem 0;
         }
-
-        .small-muted {
-            color: #68766e;
-            font-size: 0.88rem;
-        }
     </style>
     """,
     unsafe_allow_html=True,
@@ -176,9 +173,10 @@ st.markdown(
     <div class="eco-header">
         <h1>🌱 EcoComply</h1>
         <p>
-            Evidence-based environmental compliance research for small businesses.
-            EcoComply retrieves official regulatory sources, analyzes applicability,
-            and shows exactly why a requirement was flagged.
+            Evidence-based environmental compliance research for small
+            businesses. EcoComply retrieves official regulatory sources,
+            identifies relevant requirements, and shows why each result
+            was flagged.
         </p>
     </div>
     """,
@@ -202,8 +200,7 @@ REGULATORY_TOPICS = {
                 "spent solvent",
                 "solvent",
                 "waste oil",
-                "hazardous material",
-                "discarded",
+                "generator",
             ],
         },
         {
@@ -211,9 +208,8 @@ REGULATORY_TOPICS = {
             "url": "https://www.ecfr.gov/current/title-40/chapter-I/subchapter-I/part-262",
             "source_type": "eCFR",
             "keywords": [
-                "generator",
                 "hazardous waste",
-                "waste generator",
+                "generator",
                 "accumulation",
                 "manifest",
                 "recordkeeping",
@@ -238,7 +234,6 @@ REGULATORY_TOPICS = {
                 "hazardous waste",
                 "disposal",
                 "solvent",
-                "waste",
                 "container",
             ],
         },
@@ -283,7 +278,6 @@ REGULATORY_TOPICS = {
                 "paint",
                 "coating",
                 "hazardous air pollutant",
-                "HAP",
             ],
         },
         {
@@ -317,7 +311,6 @@ REGULATORY_TOPICS = {
             "source_type": "eCFR",
             "keywords": [
                 "notification",
-                "air",
                 "paint",
                 "surface coating",
             ],
@@ -411,7 +404,6 @@ REGULATORY_TOPICS = {
                 "stormwater",
                 "water discharge",
                 "discharge",
-                "water",
                 "runoff",
                 "permit",
             ],
@@ -433,17 +425,34 @@ REGULATORY_TOPICS = {
 
 
 # ============================================================
-# HELPER FUNCTIONS
+# TEXT HELPERS
 # ============================================================
 
 def clean_text(text: str) -> str:
     """Remove HTML and normalize whitespace."""
+
     if not text:
         return ""
 
-    text = re.sub(r"<script.*?</script>", " ", text, flags=re.I | re.S)
-    text = re.sub(r"<style.*?</style>", " ", text, flags=re.I | re.S)
-    text = re.sub(r"<[^>]+>", " ", text)
+    text = re.sub(
+        r"<script.*?</script>",
+        " ",
+        text,
+        flags=re.I | re.S,
+    )
+
+    text = re.sub(
+        r"<style.*?</style>",
+        " ",
+        text,
+        flags=re.I | re.S,
+    )
+
+    text = re.sub(
+        r"<[^>]+>",
+        " ",
+        text,
+    )
 
     replacements = {
         "&nbsp;": " ",
@@ -457,17 +466,35 @@ def clean_text(text: str) -> str:
     for old, new in replacements.items():
         text = text.replace(old, new)
 
-    text = re.sub(r"\s+", " ", text)
+    text = re.sub(
+        r"\s+",
+        " ",
+        text,
+    )
+
     return text.strip()
 
 
-def score_relevance(text: str, business_description: str) -> int:
-    """Simple deterministic relevance score."""
+def score_relevance(
+    text: str,
+    business_description: str,
+    keywords: List[str],
+) -> int:
+    """
+    Deterministic relevance score.
+
+    This happens locally, before the AI sees the evidence.
+    """
+
     haystack = (
         f"{business_description} {text}"
     ).lower()
 
     score = 0
+
+    for keyword in keywords:
+        if keyword.lower() in haystack:
+            score += 4
 
     important_terms = [
         "shall",
@@ -490,94 +517,164 @@ def score_relevance(text: str, business_description: str) -> int:
 
     for term in important_terms:
         if term in haystack:
-            score += 2
+            score += 1
 
     return score
 
 
-def detect_topics(business_description: str) -> List[str]:
-    """Determine which regulatory topic groups are relevant."""
-    text = business_description.lower()
+def extract_relevant_passages(
+    text: str,
+    business_description: str,
+    keywords: List[str],
+) -> str:
+    """
+    Extract only small, relevant portions of a retrieved page.
 
-    topic_keywords = {
-        "Hazardous waste": [
-            "hazardous waste",
-            "waste",
-            "spent solvent",
-            "solvent",
-            "waste oil",
-            "chemical waste",
-        ],
-        "Materials storage and releases": [
-            "storage",
-            "container",
-            "spill",
-            "release",
-            "chemical",
-            "fuel",
-        ],
-        "Air emissions and VOCs": [
-            "air",
-            "emission",
-            "voc",
-            "paint",
-            "spray",
-            "coating",
-            "solvent",
-        ],
-        "Paint and surface coating": [
-            "paint",
-            "painting",
-            "spray",
-            "surface coating",
-            "auto body",
-            "collision repair",
-            "body shop",
-        ],
-        "General environmental requirements": [
-            "automotive",
-            "repair",
-            "environmental",
-            "business",
-        ],
-        "Stormwater and water discharges": [
-            "stormwater",
-            "runoff",
-            "water discharge",
-            "discharge",
-            "drain",
-            "wastewater",
-        ],
-    }
+    This is the key token-saving step.
 
-    matched = []
+    Instead of sending thousands of characters from every page to
+    the model, we select a handful of sentences surrounding terms
+    relevant to the business/topic.
+    """
 
-    for topic, keywords in topic_keywords.items():
-        if any(keyword in text for keyword in keywords):
-            matched.append(topic)
+    if not text:
+        return ""
 
-    if not matched:
-        matched = ["General environmental requirements"]
+    # Split into sentence-ish chunks.
+    chunks = re.split(
+        r"(?<=[.!?])\s+",
+        text,
+    )
 
-    return matched
+    if len(chunks) <= 1:
+        chunks = [
+            text[i:i + 500]
+            for i in range(
+                0,
+                len(text),
+                500,
+            )
+        ]
 
+    keyword_set = [
+        keyword.lower()
+        for keyword in keywords
+    ]
+
+    important_terms = [
+        "shall",
+        "must",
+        "required",
+        "applicable",
+        "notification",
+        "recordkeeping",
+        "training",
+        "storage",
+        "disposal",
+        "emission",
+        "hazardous",
+        "paint",
+        "coating",
+        "waste",
+        "permit",
+        "methylene chloride",
+        "MeCl",
+        "minimization",
+    ]
+
+    scored_chunks = []
+
+    for index, chunk in enumerate(chunks):
+
+        lowered = chunk.lower()
+
+        score = 0
+
+        for keyword in keyword_set:
+            if keyword in lowered:
+                score += 5
+
+        for term in important_terms:
+            if term.lower() in lowered:
+                score += 2
+
+        # Business-specific terms get extra weight.
+        business_words = re.findall(
+            r"[a-zA-Z]{4,}",
+            business_description.lower(),
+        )
+
+        for word in business_words[:50]:
+            if word in lowered:
+                score += 1
+
+        if score > 0:
+            scored_chunks.append(
+                (
+                    score,
+                    index,
+                    chunk,
+                )
+            )
+
+    scored_chunks.sort(
+        reverse=True
+    )
+
+    selected = []
+
+    # Maximum 7 small passages per source.
+    for _, index, chunk in scored_chunks[:7]:
+
+        # Keep individual passages compact.
+        chunk = chunk.strip()
+
+        if len(chunk) > 450:
+            chunk = chunk[:450].rsplit(
+                " ",
+                1,
+            )[0] + "..."
+
+        selected.append(
+            (
+                index,
+                chunk,
+            )
+        )
+
+    # Restore original order.
+    selected.sort(
+        key=lambda item: item[0]
+    )
+
+    result = " ".join(
+        chunk
+        for _, chunk in selected
+    )
+
+    # Absolute per-source cap.
+    return result[:1800]
+
+
+# ============================================================
+# PLAYWRIGHT
+# ============================================================
 
 def ensure_playwright_browser() -> None:
     """
-    Make sure the Playwright Chromium browser is actually installed.
+    Ensure the Chromium executable exists.
 
-    The Python package and browser executable are separate dependencies.
+    The Playwright Python package and browser binaries are separate.
     """
+
     try:
-        from playwright.sync_api import sync_playwright
 
         with sync_playwright() as p:
+
             executable = p.chromium.executable_path
 
-        import os
-
-        if os.path.exists(executable):
-            return
+            if os.path.exists(executable):
+                return
 
     except Exception:
         pass
@@ -595,26 +692,25 @@ def ensure_playwright_browser() -> None:
 
 
 def scrape_page(url: str) -> str:
-    """
-    Retrieve a page using Playwright.
+    """Retrieve an official regulatory page with Playwright."""
 
-    Only URLs from the curated source catalog are used.
-    """
     ensure_playwright_browser()
 
     with sync_playwright() as p:
+
         browser = p.chromium.launch(
             headless=True
         )
 
         page = browser.new_page(
             user_agent=(
-                "Mozilla/5.0 (compatible; EcoComply/1.0; "
-                "+https://ecocomply.streamlit.app)"
+                "Mozilla/5.0 "
+                "(compatible; EcoComply/1.0)"
             )
         )
 
         try:
+
             page.goto(
                 url,
                 wait_until="domcontentloaded",
@@ -623,7 +719,9 @@ def scrape_page(url: str) -> str:
 
             page.wait_for_timeout(1000)
 
-            text = page.locator("body").inner_text(
+            text = page.locator(
+                "body"
+            ).inner_text(
                 timeout=15000
             )
 
@@ -632,56 +730,159 @@ def scrape_page(url: str) -> str:
         finally:
             browser.close()
 
-    # Reject obvious access/error pages.
     blocked_phrases = [
         "access denied",
         "request access",
         "403 forbidden",
         "404 not found",
         "captcha",
-        "enable javascript",
         "checking your browser",
+        "enable javascript",
     ]
 
     lowered = text.lower()
 
-    if any(phrase in lowered for phrase in blocked_phrases):
+    if any(
+        phrase in lowered
+        for phrase in blocked_phrases
+    ):
         return ""
 
-    # Very small pages usually aren't useful regulatory evidence.
     if len(text) < 500:
         return ""
 
     return text
 
 
-def build_source_catalog(topics: List[str]) -> List[Dict[str, Any]]:
-    """Create a deduplicated source list."""
+# ============================================================
+# TOPIC DETECTION
+# ============================================================
+
+def detect_topics(
+    business_description: str,
+) -> List[str]:
+
+    text = business_description.lower()
+
+    topic_keywords = {
+
+        "Hazardous waste": [
+            "hazardous waste",
+            "waste",
+            "spent solvent",
+            "solvent",
+            "waste oil",
+            "chemical waste",
+        ],
+
+        "Materials storage and releases": [
+            "storage",
+            "container",
+            "spill",
+            "release",
+            "chemical",
+            "fuel",
+        ],
+
+        "Air emissions and VOCs": [
+            "air",
+            "emission",
+            "voc",
+            "paint",
+            "spray",
+            "coating",
+            "solvent",
+        ],
+
+        "Paint and surface coating": [
+            "paint",
+            "painting",
+            "spray",
+            "surface coating",
+            "auto body",
+            "collision repair",
+            "body shop",
+        ],
+
+        "General environmental requirements": [
+            "automotive",
+            "repair",
+            "environmental",
+            "business",
+        ],
+
+        "Stormwater and water discharges": [
+            "stormwater",
+            "runoff",
+            "water discharge",
+            "discharge",
+            "drain",
+            "wastewater",
+        ],
+    }
+
+    matched = []
+
+    for topic, keywords in topic_keywords.items():
+
+        if any(
+            keyword in text
+            for keyword in keywords
+        ):
+            matched.append(topic)
+
+    if not matched:
+        matched = [
+            "General environmental requirements"
+        ]
+
+    return matched
+
+
+# ============================================================
+# SOURCE CATALOG
+# ============================================================
+
+def build_source_catalog(
+    topics: List[str],
+) -> List[Dict[str, Any]]:
+
     sources = []
     seen_urls = set()
 
     for topic in topics:
-        for source in REGULATORY_TOPICS.get(topic, []):
-            if source["url"] not in seen_urls:
-                copied = dict(source)
-                copied["topic"] = topic
-                sources.append(copied)
-                seen_urls.add(source["url"])
+
+        for source in REGULATORY_TOPICS.get(
+            topic,
+            [],
+        ):
+
+            if source["url"] in seen_urls:
+                continue
+
+            copied = dict(source)
+            copied["topic"] = topic
+
+            sources.append(copied)
+            seen_urls.add(
+                source["url"]
+            )
 
     return sources
 
+
+# ============================================================
+# EVIDENCE RETRIEVAL
+# ============================================================
 
 def retrieve_evidence(
     business_description: str,
     topics: List[str],
 ) -> List[Dict[str, Any]]:
-    """
-    Retrieve a bounded set of official sources.
 
-    Limits are intentionally conservative so the LLM request stays
-    within token limits.
-    """
-    catalog = build_source_catalog(topics)
+    catalog = build_source_catalog(
+        topics
+    )
 
     retrieved = []
 
@@ -690,45 +891,67 @@ def retrieve_evidence(
 
     total = len(catalog)
 
-    for index, source in enumerate(catalog):
+    for index, source in enumerate(
+        catalog
+    ):
+
         status.info(
             f"Searching official sources... "
-            f"{index + 1}/{total}: {source['name']}"
+            f"{index + 1}/{total}: "
+            f"{source['name']}"
         )
 
         try:
-            text = scrape_page(source["url"])
 
-            if text:
+            full_text = scrape_page(
+                source["url"]
+            )
+
+            if full_text:
+
                 score = score_relevance(
-                    text,
+                    full_text,
                     business_description,
+                    source["keywords"],
                 )
 
-                # Keep a bounded excerpt.
-                excerpt = text[:3500]
-
-                retrieved.append(
-                    {
-                        "name": source["name"],
-                        "url": source["url"],
-                        "source_type": source["source_type"],
-                        "topic": source["topic"],
-                        "relevance_score": score,
-                        "evidence": excerpt,
-                    }
+                relevant_passages = (
+                    extract_relevant_passages(
+                        full_text,
+                        business_description,
+                        source["keywords"],
+                    )
                 )
+
+                if relevant_passages:
+
+                    retrieved.append(
+                        {
+                            "name": source["name"],
+                            "url": source["url"],
+                            "source_type": source[
+                                "source_type"
+                            ],
+                            "topic": source["topic"],
+                            "relevance_score": score,
+                            "evidence": relevant_passages,
+                            "full_text": full_text,
+                        }
+                    )
 
         except Exception as exc:
-            # A single failed source should not kill the entire research run.
+
             retrieved.append(
                 {
                     "name": source["name"],
                     "url": source["url"],
-                    "source_type": source["source_type"],
+                    "source_type": source[
+                        "source_type"
+                    ],
                     "topic": source["topic"],
                     "relevance_score": 0,
                     "evidence": "",
+                    "full_text": "",
                     "error": str(exc),
                 }
             )
@@ -740,53 +963,38 @@ def retrieve_evidence(
     status.empty()
     progress.empty()
 
-    # Sort strongest evidence first.
+    # Strongest sources first.
     retrieved.sort(
         key=lambda item: item.get(
             "relevance_score",
-            0
+            0,
         ),
         reverse=True,
     )
 
-    # Maximum six evidence sources.
+    # Keep at most 5 sources in the AI evidence packet.
     usable = [
         source
         for source in retrieved
         if source.get("evidence")
-    ][:6]
+    ][:5]
 
-    # Hard total evidence limit.
-    max_total_chars = 17000
-    final_sources = []
-    total_chars = 0
-
-    for source in usable:
-        evidence = source["evidence"]
-
-        remaining = max_total_chars - total_chars
-
-        if remaining <= 0:
-            break
-
-        evidence = evidence[:remaining]
-
-        copied = dict(source)
-        copied["evidence"] = evidence
-
-        final_sources.append(copied)
-
-        total_chars += len(evidence)
-
-    return final_sources
+    return usable
 
 
-def extract_json(text: str) -> Dict[str, Any]:
-    """Safely extract JSON from an LLM response."""
+# ============================================================
+# JSON EXTRACTION
+# ============================================================
+
+def extract_json(
+    text: str,
+) -> Dict[str, Any]:
+
     text = text.strip()
 
     try:
         return json.loads(text)
+
     except json.JSONDecodeError:
         pass
 
@@ -797,15 +1005,23 @@ def extract_json(text: str) -> Dict[str, Any]:
     )
 
     if match:
+
         try:
-            return json.loads(match.group(0))
+            return json.loads(
+                match.group(0)
+            )
+
         except json.JSONDecodeError:
             pass
 
     raise ValueError(
-        "The AI returned invalid structured data."
+        "The AI returned invalid JSON."
     )
 
+
+# ============================================================
+# AI ANALYSIS
+# ============================================================
 
 def analyze_compliance(
     business_description: str,
@@ -819,102 +1035,124 @@ def analyze_compliance(
 
     if not api_key:
         raise RuntimeError(
-            "GROQ_API_KEY is missing from Streamlit secrets."
+            "GROQ_API_KEY is missing from "
+            "Streamlit secrets."
         )
 
-    client = Groq(api_key=api_key)
+    client = Groq(
+        api_key=api_key
+    )
+
+    # --------------------------------------------------------
+    # Build a deliberately SMALL evidence packet.
+    #
+    # This is intentionally kept far below the 8K TPM limit.
+    # --------------------------------------------------------
 
     evidence_packet = []
 
     for source in evidence:
+
         evidence_packet.append(
             {
                 "source": source["name"],
-                "source_type": source["source_type"],
                 "topic": source["topic"],
-                "url": source["url"],
-                "evidence": source["evidence"],
+                "citation_source_url": source["url"],
+                "evidence": source["evidence"][:1400],
             }
         )
 
     packet_text = json.dumps(
         evidence_packet,
         ensure_ascii=False,
+        separators=(
+            ",",
+            ":",
+        ),
     )
 
-    business_description = business_description[:4000]
+    business_description = (
+        business_description[:2500]
+    )
 
     system_prompt = """
-You are the analysis engine for EcoComply.
+You are EcoComply's environmental compliance analysis engine.
 
-EcoComply performs preliminary environmental compliance research.
+Use ONLY the evidence supplied by the application.
 
-IMPORTANT RULES:
+Rules:
+- Never invent regulations, citations, deadlines, penalties,
+  exemptions, thresholds, or requirements.
+- Every requirement must cite a supplied source.
+- Do not declare legal compliance.
+- If information is missing, use "Needs Review".
+- Use "Action Required" only when the supplied evidence shows
+  the business is missing or failing a requirement.
+- Use "Compliant" only when the business information appears
+  to satisfy that specific requirement.
+- Use "Not Applicable" only when the evidence clearly establishes
+  that the requirement does not apply.
+- Be concise.
+- Return ONLY valid JSON.
 
-1. Use ONLY the regulatory evidence provided in the evidence packet.
-2. Never invent a regulation, citation, deadline, penalty, exemption,
-   threshold, requirement, agency, or URL.
-3. Every requirement must cite one of the provided sources.
-4. If the evidence does not establish something, say that it cannot
-   be determined from the available evidence.
-5. Do not claim that a business is legally compliant.
-6. "Compliant" means the provided business evidence appears to satisfy
-   the specific requirement based on the retrieved evidence.
-7. Missing information should normally produce "Needs Review", not
-   "Action Required".
-8. "Action Required" should be used only when the evidence establishes
-   that the business is missing or failing a requirement.
-9. "Not Applicable" should only be used when the provided evidence
-   clearly establishes that the requirement does not apply.
-10. Keep requirements specific and traceable.
-11. Do not make broad legal conclusions.
-
-For every requirement provide:
-- title
-- status
-- requirement
-- citation
-- regulatory_evidence
-- business_evidence
-- why_flagged
-- recommended_action
-- source_url
-
-Return ONLY valid JSON.
+For each requirement explain:
+1. what the regulation requires,
+2. what the business evidence says,
+3. why the result was assigned,
+4. what should happen next.
 """
 
     user_prompt = f"""
-BUSINESS DESCRIPTION:
+BUSINESS:
 {business_description}
 
-REGULATORY EVIDENCE:
+OFFICIAL REGULATORY EVIDENCE:
 {packet_text}
 
-Return JSON using exactly this structure:
+Return exactly:
 
 {{
   "overall_status": "Compliant | Needs Review | Action Required",
-  "summary": "short explanation",
+  "summary": "short summary",
   "requirements": [
     {{
-      "title": "string",
+      "title": "short title",
       "status": "Compliant | Needs Review | Action Required | Not Applicable",
-      "requirement": "string",
-      "citation": "string",
-      "regulatory_evidence": "string",
-      "business_evidence": "string",
-      "why_flagged": "string",
-      "recommended_action": "string",
-      "source_url": "string"
+      "requirement": "specific requirement",
+      "citation": "specific citation",
+      "regulatory_evidence": "short evidence passage",
+      "business_evidence": "what the business information establishes",
+      "why_flagged": "why this status was assigned",
+      "recommended_action": "specific next step",
+      "source_url": "URL from supplied evidence"
     }}
   ],
   "next_steps": [
-    "string"
+    "specific next step"
   ]
 }}
 
-Prioritize concrete, verifiable requirements over generic advice.
+Keep the number of requirements focused on the most important
+requirements supported by the supplied evidence.
 """
+
+    # --------------------------------------------------------
+    # Final request-size guard.
+    #
+    # This does NOT replace the evidence limits above. It is
+    # simply an additional safety net.
+    # --------------------------------------------------------
+
+    estimated_input_tokens = (
+        len(system_prompt)
+        + len(user_prompt)
+    ) // 4
+
+    if estimated_input_tokens > 4500:
+        raise RuntimeError(
+            "The regulatory evidence packet is still too large. "
+            "EcoComply stopped before sending an oversized AI request."
+        )
 
     response = client.chat.completions.create(
         model="openai/gpt-oss-120b",
@@ -929,18 +1167,31 @@ Prioritize concrete, verifiable requirements over generic advice.
             },
         ],
         temperature=0.1,
-        max_tokens=4500,
+
+        # Deliberately much smaller than before.
+        # This keeps the total request comfortably below
+        # the free/on-demand TPM budget.
+        max_tokens=2200,
+
+        # Reduce reasoning overhead for this structured task.
+        reasoning_effort="low",
     )
 
     content = response.choices[0].message.content
 
-    result = extract_json(content)
+    return extract_json(
+        content
+    )
 
-    return result
 
+# ============================================================
+# DISPLAY HELPERS
+# ============================================================
 
-def normalize_status(status: str) -> str:
-    """Normalize status text for display."""
+def normalize_status(
+    status: str,
+) -> str:
+
     if not status:
         return "Needs Review"
 
@@ -959,17 +1210,25 @@ def normalize_status(status: str) -> str:
     )
 
 
-def status_icon(status: str) -> str:
+def status_icon(
+    status: str,
+) -> str:
+
     return {
         "Compliant": "✅",
         "Needs Review": "⚠️",
         "Action Required": "🔴",
         "Not Applicable": "➖",
-    }.get(status, "⚠️")
+    }.get(
+        status,
+        "⚠️",
+    )
 
 
-def clean_requirement(requirement: Dict[str, Any]) -> Dict[str, Any]:
-    """Ensure every expected field exists."""
+def clean_requirement(
+    requirement: Dict[str, Any],
+) -> Dict[str, Any]:
+
     return {
         "title": str(
             requirement.get(
@@ -1035,12 +1294,15 @@ def clean_requirement(requirement: Dict[str, Any]) -> Dict[str, Any]:
 # ============================================================
 
 with st.sidebar:
-    st.header("Business profile")
+
+    st.header(
+        "Business profile"
+    )
 
     st.caption(
         "Describe what the business does. "
-        "EcoComply uses this information to select relevant "
-        "official regulatory sources."
+        "EcoComply uses this information to select "
+        "relevant official regulatory sources."
     )
 
     preset = st.selectbox(
@@ -1054,24 +1316,29 @@ with st.sidebar:
     )
 
     presets = {
+
         "Auto body shop": (
             "We operate an auto body repair shop. "
-            "We repair damaged vehicles, perform sanding and painting, "
-            "use spray application equipment, and store paints, solvents, "
-            "and other automotive chemicals. "
-            "We generate used solvent containers and other waste materials."
+            "We repair damaged vehicles, perform sanding "
+            "and painting, use spray application equipment, "
+            "and store paints, solvents, and other automotive "
+            "chemicals. We generate used solvent containers "
+            "and other waste materials."
         ),
+
         "Automotive repair shop": (
             "We operate an automotive repair shop. "
-            "We perform mechanical repairs, use automotive fluids and "
-            "cleaning solvents, store chemicals and parts, and generate "
-            "used fluids and other waste."
+            "We perform mechanical repairs, use automotive "
+            "fluids and cleaning solvents, store chemicals "
+            "and parts, and generate used fluids and other waste."
         ),
+
         "Small manufacturing shop": (
             "We operate a small manufacturing facility. "
-            "We use paints, coatings, solvents, and other chemicals "
-            "during production and store these materials on site. "
-            "We generate industrial waste and may have air emissions."
+            "We use paints, coatings, solvents, and other "
+            "chemicals during production and store these "
+            "materials on site. We generate industrial waste "
+            "and may have air emissions."
         ),
     }
 
@@ -1085,8 +1352,8 @@ with st.sidebar:
         value=default_description,
         height=230,
         placeholder=(
-            "Example: We operate an auto body shop and paint "
-            "damaged vehicles..."
+            "Example: We operate an auto body shop "
+            "and paint damaged vehicles..."
         ),
     )
 
@@ -1099,7 +1366,7 @@ with st.sidebar:
         1. Understand the business
         2. Identify regulatory topics
         3. Retrieve official sources
-        4. Extract regulatory evidence
+        4. Extract relevant evidence
         5. Analyze requirements
         6. Show the evidence chain
         """
@@ -1113,7 +1380,7 @@ with st.sidebar:
 
 
 # ============================================================
-# INITIAL STATE
+# SESSION STATE
 # ============================================================
 
 if "assessment" not in st.session_state:
@@ -1127,31 +1394,30 @@ if "topics" not in st.session_state:
 
 
 # ============================================================
-# RUN ANALYSIS
+# RUN
 # ============================================================
 
 if run_analysis:
 
     if not business_description.strip():
+
         st.error(
             "Please enter a business description first."
         )
+
         st.stop()
 
     try:
-        # --------------------------------------------
-        # 1. Identify topics
-        # --------------------------------------------
+
+        # ----------------------------------------------------
+        # TOPICS
+        # ----------------------------------------------------
 
         topics = detect_topics(
             business_description
         )
 
         st.session_state.topics = topics
-
-        # --------------------------------------------
-        # 2. Regulatory research
-        # --------------------------------------------
 
         st.markdown(
             '<div class="section-label">Research</div>',
@@ -1167,9 +1433,14 @@ if run_analysis:
             + ", ".join(topics)
         )
 
+        # ----------------------------------------------------
+        # RETRIEVAL
+        # ----------------------------------------------------
+
         with st.spinner(
             "Searching official regulatory sources..."
         ):
+
             sources = retrieve_evidence(
                 business_description,
                 topics,
@@ -1178,27 +1449,30 @@ if run_analysis:
         st.session_state.sources = sources
 
         if not sources:
+
             st.error(
-                "EcoComply could not retrieve usable regulatory "
-                "evidence from the official sources."
+                "EcoComply could not retrieve usable "
+                "regulatory evidence from the official sources."
             )
+
             st.stop()
 
         st.markdown(
             f"""
             <div class="research-success">
                 <strong>✓ Research complete</strong><br>
-                Retrieved {len(sources)} usable official source
-                {"page" if len(sources) == 1 else "pages"}.
-                The compliance analysis below is limited to this evidence.
+                Retrieved {len(sources)} usable official
+                {"source" if len(sources) == 1 else "sources"}.
+                Relevant passages were extracted locally before
+                the AI analysis.
             </div>
             """,
             unsafe_allow_html=True,
         )
 
-        # --------------------------------------------
-        # 3. AI analysis
-        # --------------------------------------------
+        # ----------------------------------------------------
+        # ANALYSIS
+        # ----------------------------------------------------
 
         st.markdown(
             '<div class="section-label">Analysis</div>',
@@ -1210,8 +1484,10 @@ if run_analysis:
         )
 
         with st.spinner(
-            "Comparing business information against retrieved requirements..."
+            "Comparing business information against "
+            "retrieved requirements..."
         ):
+
             assessment = analyze_compliance(
                 business_description,
                 sources,
@@ -1220,18 +1496,25 @@ if run_analysis:
         st.session_state.assessment = assessment
 
     except Exception as exc:
+
         st.error(
-            "EcoComply encountered an error while running the assessment."
+            "EcoComply encountered an error while running "
+            "the assessment."
         )
 
-        with st.expander("Technical details"):
-            st.code(str(exc))
+        with st.expander(
+            "Technical details"
+        ):
+
+            st.code(
+                str(exc)
+            )
 
         st.stop()
 
 
 # ============================================================
-# DISPLAY ASSESSMENT
+# DISPLAY
 # ============================================================
 
 assessment = st.session_state.assessment
@@ -1261,9 +1544,9 @@ if assessment:
         [],
     )
 
-    # --------------------------------------------
-    # Summary
-    # --------------------------------------------
+    # --------------------------------------------------------
+    # SUMMARY
+    # --------------------------------------------------------
 
     st.markdown(
         '<div class="section-label">Assessment</div>',
@@ -1292,6 +1575,7 @@ if assessment:
     )
 
     with col1:
+
         st.markdown(
             f"""
             <div class="status-card">
@@ -1306,39 +1590,50 @@ if assessment:
         )
 
     with col2:
+
         st.markdown(
             f"""
             <div class="status-card">
                 <div class="label">Requirements</div>
-                <div class="value">{len(requirements)}</div>
+                <div class="value">
+                    {len(requirements)}
+                </div>
             </div>
             """,
             unsafe_allow_html=True,
         )
 
     with col3:
+
         st.markdown(
             f"""
             <div class="status-card">
                 <div class="label">Action Required</div>
-                <div class="value">{action_count}</div>
+                <div class="value">
+                    {action_count}
+                </div>
             </div>
             """,
             unsafe_allow_html=True,
         )
 
     with col4:
+
         st.markdown(
             f"""
             <div class="status-card">
                 <div class="label">Needs Review</div>
-                <div class="value">{review_count}</div>
+                <div class="value">
+                    {review_count}
+                </div>
             </div>
             """,
             unsafe_allow_html=True,
         )
 
-    st.markdown("### Summary")
+    st.markdown(
+        "### Summary"
+    )
 
     st.write(
         assessment.get(
@@ -1347,20 +1642,24 @@ if assessment:
         )
     )
 
-    # --------------------------------------------
-    # Evidence chain explanation
-    # --------------------------------------------
+    # --------------------------------------------------------
+    # EVIDENCE CHAIN
+    # --------------------------------------------------------
 
-    st.markdown("### 🧠 How EcoComply reached these results")
+    st.markdown(
+        "### 🧠 How EcoComply reached these results"
+    )
 
     st.caption(
-        "EcoComply does not simply ask an AI model whether the business "
-        "is compliant. Each finding follows an evidence chain."
+        "EcoComply does not simply ask an AI model whether "
+        "the business is compliant. Each finding follows "
+        "an evidence chain."
     )
 
     chain1, chain2, chain3, chain4 = st.columns(4)
 
     with chain1:
+
         st.markdown(
             """
             **1. Business evidence**
@@ -1370,6 +1669,7 @@ if assessment:
         )
 
     with chain2:
+
         st.markdown(
             """
             **2. Regulatory evidence**
@@ -1379,16 +1679,18 @@ if assessment:
         )
 
     with chain3:
+
         st.markdown(
             """
             **3. Gap analysis**
 
-            Whether the available business information
+            Whether the available information
             establishes that requirement.
             """
         )
 
     with chain4:
+
         st.markdown(
             """
             **4. Next step**
@@ -1397,103 +1699,108 @@ if assessment:
             """
         )
 
-    # --------------------------------------------
-    # Requirements
-    # --------------------------------------------
+    # --------------------------------------------------------
+    # REQUIREMENTS
+    # --------------------------------------------------------
 
-    st.markdown("### 📑 Regulatory requirements")
+    st.markdown(
+        "### 📑 Regulatory requirements"
+    )
 
     if not requirements:
+
         st.warning(
-            "No specific requirements were produced from the retrieved evidence."
+            "No specific requirements were produced "
+            "from the retrieved evidence."
         )
 
-    for index, req in enumerate(requirements, start=1):
+    for req in requirements:
 
         status = req["status"]
 
-        with st.container():
+        st.markdown(
+            f"""
+            <div class="requirement-card">
+                <div class="requirement-title">
+                    {status_icon(status)}
+                    {req["title"]}
+                </div>
+            </div>
+            """,
+            unsafe_allow_html=True,
+        )
+
+        st.markdown(
+            f"**Status:** {status}"
+        )
+
+        st.markdown(
+            f"**Requirement**  \n{req['requirement']}"
+        )
+
+        st.markdown(
+            f"**Citation**  \n`{req['citation']}`"
+        )
+
+        evidence_col, business_col = st.columns(2)
+
+        with evidence_col:
+
+            st.markdown(
+                "#### 📜 Regulatory evidence"
+            )
 
             st.markdown(
                 f"""
-                <div class="requirement-card">
-                    <div class="requirement-title">
-                        {status_icon(status)}
-                        {req["title"]}
-                    </div>
+                <div class="evidence-box">
+                    {req["regulatory_evidence"]}
                 </div>
                 """,
                 unsafe_allow_html=True,
             )
 
-            st.markdown(
-                f"**Status:** {status}"
-            )
+        with business_col:
 
             st.markdown(
-                f"**Requirement**  \n{req['requirement']}"
+                "#### 🏢 Business evidence"
             )
 
             st.markdown(
-                f"**Citation**  \n`{req['citation']}`"
+                f"""
+                <div class="evidence-box">
+                    {req["business_evidence"]}
+                </div>
+                """,
+                unsafe_allow_html=True,
             )
 
-            evidence_col, business_col = st.columns(2)
+        st.markdown(
+            "#### 🔍 Why EcoComply flagged this"
+        )
 
-            with evidence_col:
-                st.markdown(
-                    "#### 📜 Regulatory evidence"
-                )
+        st.write(
+            req["why_flagged"]
+        )
 
-                st.markdown(
-                    f"""
-                    <div class="evidence-box">
-                        {req["regulatory_evidence"]}
-                    </div>
-                    """,
-                    unsafe_allow_html=True,
-                )
+        st.markdown(
+            "#### ➡️ Recommended action"
+        )
 
-            with business_col:
-                st.markdown(
-                    "#### 🏢 Business evidence"
-                )
+        st.write(
+            req["recommended_action"]
+        )
 
-                st.markdown(
-                    f"""
-                    <div class="evidence-box">
-                        {req["business_evidence"]}
-                    </div>
-                    """,
-                    unsafe_allow_html=True,
-                )
+        if req["source_url"]:
 
             st.markdown(
-                "#### 🔍 Why EcoComply flagged this"
+                f"[🔗 Open official source]({req['source_url']})"
             )
 
-            st.write(
-                req["why_flagged"]
-            )
+        st.divider()
 
-            st.markdown(
-                "#### ➡️ Recommended action"
-            )
-
-            st.write(
-                req["recommended_action"]
-            )
-
-            if req["source_url"]:
-                st.markdown(
-                    f"🔗 [Open official source]({req['source_url']})"
-                )
-
-            st.divider()
-
-    # --------------------------------------------
-    # Next steps
-    # --------------------------------------------
+    # --------------------------------------------------------
+    # NEXT STEPS
+    # --------------------------------------------------------
 
     st.markdown(
         '<div class="section-label">Action plan</div>',
@@ -1507,6 +1814,7 @@ if assessment:
     if next_steps:
 
         for step in next_steps:
+
             st.markdown(
                 f"""
                 <div class="next-step">
@@ -1517,13 +1825,14 @@ if assessment:
             )
 
     else:
+
         st.info(
             "No additional next steps were generated."
         )
 
-    # --------------------------------------------
-    # Sources
-    # --------------------------------------------
+    # --------------------------------------------------------
+    # SOURCES
+    # --------------------------------------------------------
 
     st.markdown(
         '<div class="section-label">Evidence</div>',
@@ -1535,8 +1844,9 @@ if assessment:
     )
 
     st.caption(
-        "These are the sources EcoComply actually retrieved and supplied "
-        "to the analysis engine."
+        "These are the sources EcoComply actually retrieved. "
+        "Only relevant passages from them were sent to the "
+        "analysis engine."
     )
 
     for source in sources:
@@ -1569,15 +1879,16 @@ if assessment:
         )
 
         with st.expander(
-            "View retrieved evidence"
+            "View evidence used by EcoComply"
         ):
+
             st.write(
                 source["evidence"]
             )
 
-    # --------------------------------------------
-    # Structured JSON
-    # --------------------------------------------
+    # --------------------------------------------------------
+    # EXPORT
+    # --------------------------------------------------------
 
     st.markdown(
         '<div class="section-label">Export</div>',
@@ -1591,7 +1902,21 @@ if assessment:
     export_data = {
         "business_description": business_description,
         "targeted_topics": topics,
-        "retrieved_sources": sources,
+        "retrieved_sources": [
+            {
+                "name": source["name"],
+                "url": source["url"],
+                "source_type": source["source_type"],
+                "topic": source["topic"],
+                "relevance_score": source[
+                    "relevance_score"
+                ],
+                "evidence": source[
+                    "evidence"
+                ],
+            }
+            for source in sources
+        ],
         "assessment": assessment,
     }
 
@@ -1606,20 +1931,20 @@ if assessment:
         data=json_data,
         file_name="ecocomply_assessment.json",
         mime="application/json",
-        use_container_width=False,
     )
 
     with st.expander(
         "View raw JSON"
     ):
+
         st.code(
             json_data,
             language="json",
         )
 
-    # --------------------------------------------
-    # Limitations
-    # --------------------------------------------
+    # --------------------------------------------------------
+    # LIMITATIONS
+    # --------------------------------------------------------
 
     st.markdown(
         '<div class="section-label">Transparency</div>',
@@ -1632,25 +1957,25 @@ if assessment:
 
     st.markdown(
         """
-        - EcoComply only evaluates requirements supported by the
-          regulatory evidence it successfully retrieved.
-        - Applicability can depend on details such as facility size,
-          materials used, quantities, emissions, waste generation,
-          permits, and operating practices.
-        - A "Compliant" result means the provided information appears
-          to satisfy the specific requirement based on the retrieved
-          evidence; it is not a legal determination.
-        - "Needs Review" means EcoComply does not have enough evidence
-          to establish the requirement from the information provided.
-        - EcoComply does not replace professional legal or environmental
-          compliance advice.
+        - EcoComply evaluates requirements supported by the
+          regulatory evidence it successfully retrieves.
+        - Applicability can depend on details such as facility
+          size, materials used, quantities, emissions, waste
+          generation, permits, and operating practices.
+        - A "Compliant" result means the provided information
+          appears to satisfy the specific requirement based on
+          the retrieved evidence. It is not a legal determination.
+        - "Needs Review" means EcoComply does not have enough
+          evidence to establish the requirement.
+        - EcoComply does not replace professional legal or
+          environmental compliance advice.
         """
     )
 
 else:
 
     # ========================================================
-    # LANDING STATE
+    # LANDING PAGE
     # ========================================================
 
     st.markdown(
@@ -1658,13 +1983,14 @@ else:
     )
 
     st.write(
-        "Describe a business in the sidebar, then run EcoComply's "
-        "regulatory research."
+        "Describe a business in the sidebar, then run "
+        "EcoComply's regulatory research."
     )
 
     st.info(
-        "EcoComply retrieves regulatory information from curated "
-        "official sources such as the eCFR, EPA, and Michigan EGLE."
+        "EcoComply retrieves regulatory information from "
+        "curated official sources such as the eCFR, EPA, "
+        "and Michigan EGLE."
     )
 
     st.markdown(
@@ -1672,19 +1998,19 @@ else:
         **What makes EcoComply different**
 
         **🔎 Evidence retrieval**  
-        Official regulatory pages are retrieved instead of relying
-        solely on the model's existing knowledge.
+        Official regulatory pages are retrieved instead of
+        relying solely on the model's existing knowledge.
 
         **📜 Traceable requirements**  
-        Findings are tied to specific regulatory citations and
-        source pages.
+        Findings are tied to specific regulatory citations
+        and source pages.
 
         **🧠 Evidence-based analysis**  
-        The AI receives the retrieved evidence and compares it
-        against the business description.
+        The AI receives selected regulatory evidence and
+        compares it against the business description.
 
         **⚠️ Uncertainty handling**  
-        When the available information is insufficient, EcoComply
+        When the information is insufficient, EcoComply
         says **Needs Review** instead of pretending to know.
 
         **➡️ Actionable results**  
@@ -1696,10 +2022,11 @@ else:
         """
         <div class="disclaimer">
             <strong>Important:</strong>
-            EcoComply provides a preliminary educational assessment.
-            It does not replace professional legal or environmental
-            compliance advice.
+            EcoComply provides a preliminary educational
+            assessment. It does not replace professional
+            legal or environmental compliance advice.
         </div>
         """,
         unsafe_allow_html=True,
     )
+```

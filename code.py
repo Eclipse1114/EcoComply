@@ -23,7 +23,7 @@ st.set_page_config(
 st.markdown("""
     <style>
         .stMain {
-            background-color: green;
+            background-color: lightgreen;
         }
 
         .stSidebar {

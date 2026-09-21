@@ -21,6 +21,7 @@ st.set_page_config(
 )
 
 st.markdown("""
+    <style>
     st.App {
         background-color: darkgreen;
     }
@@ -28,6 +29,7 @@ st.markdown("""
     st.Sidebar {
         background-color: brown;
     }
+    </style>
 """, unsafe_allow_html=True)
 
 

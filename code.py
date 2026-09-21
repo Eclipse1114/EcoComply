@@ -23,11 +23,11 @@ st.set_page_config(
 st.markdown("""
     <style>
         .stMain {
-            background-color: darkgreen;
+            background-color: green;
         }
 
         .stSidebar {
-            background-color: brown;
+            background-color: lightbrown;
         }
     </style>
 """, unsafe_allow_html=True)

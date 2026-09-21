@@ -20,6 +20,16 @@ st.set_page_config(
     layout="wide",
 )
 
+st.markdown("""
+    st.App {
+        background-color: darkgreen;
+    }
+
+    st.Sidebar {
+        background-color: brown;
+    }
+""", unsafe-allow-html=True)
+
 
 # ============================================================
 # HEADER

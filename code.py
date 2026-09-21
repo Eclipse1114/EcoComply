@@ -22,11 +22,11 @@ st.set_page_config(
 
 st.markdown("""
     <style>
-        stApp {
+        .stMain {
             background-color: darkgreen;
         }
 
-        stSidebar {
+        .stSidebar {
             background-color: brown;
         }
     </style>
